@@ -18,6 +18,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Controllers\" />
+    <Folder Include="DTOs\" />
     <Folder Include="Common\Middlewares\" />
     <Folder Include="NewFolder\" />
     <Folder Include="Features\" />

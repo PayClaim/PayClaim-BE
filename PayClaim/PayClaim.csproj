@@ -17,8 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Controllers\" />
     <Folder Include="Features\" />
     <Folder Include="Common\" />
+    <Folder Include="NewFolder\" />
   </ItemGroup>
 
 </Project>

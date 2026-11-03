@@ -26,4 +26,6 @@ public class Employee
     public Department Department { get; set; } = null!;
 
     public Employee? Manager { get; set; }
+    public ICollection<ProposalParticipant> ProposalParticipants { get; set; }
+    = new List<ProposalParticipant>();
 }

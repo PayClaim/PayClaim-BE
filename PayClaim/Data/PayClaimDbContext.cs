@@ -16,6 +16,15 @@ public class PayClaimDbContext : DbContext
     public DbSet<BenefitCategory> BenefitCategories { get; set; }
     public DbSet<Benefit> Benefits { get; set; }
     public DbSet<BenefitPlan> BenefitPlans { get; set; }
+    public DbSet<EmployeeBenefit> EmployeeBenefits { get; set; }
+    public DbSet<Claim> Claims { get; set; }
+    public DbSet<ClaimApproval> ClaimApprovals { get; set; }
+    public DbSet<TripProposal> TripProposals { get; set; }
+    public DbSet<TripApproval> TripApprovals { get; set; }
+    public DbSet<ProposalParticipant> ProposalParticipants { get; set; }
+    public DbSet<Account> Accounts { get; set; }
+    public DbSet<Role> Roles { get; set; }
+    public DbSet<AccountRole> AccountRoles { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

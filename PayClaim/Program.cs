@@ -1,8 +1,13 @@
 
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.EntityFrameworkCore;
-using PayClaim.Data;
 using PayClaim.Common.Exceptions;
+using PayClaim.Data;
+using PayClaim.Data.Repositories;
+using PayClaim.Data.Repositories.Interfaces;
+using PayClaim.Data.UnitOfWork;
+using PayClaim.Features.Master.Departments.Commands.CreateDepartment;
+using PayClaim.Features.Master.Departments.Queries.GetDepartments;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +20,10 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<CreateDepartmentHandler>();
+builder.Services.AddScoped<GetDepartmentsHandler>();
 
 builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
    .AddNegotiate();

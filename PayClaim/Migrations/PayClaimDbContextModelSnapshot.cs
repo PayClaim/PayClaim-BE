@@ -291,7 +291,13 @@ namespace PayClaim.Migrations
 
                     b.HasIndex("DepartmentId");
 
+                    b.HasIndex("Email")
+                        .IsUnique();
+
                     b.HasIndex("ManagerId");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
 
                     b.HasIndex("PositionId");
 

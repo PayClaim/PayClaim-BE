@@ -5,7 +5,7 @@ namespace PayClaim.DTOs.Claim;
 
 public class CreateClaimDto
 {
-    [Required(ErrorMessage = "Claim type is required.")]
+    [EnumDataType(typeof(ClaimType))]
     public ClaimType ClaimType { get; set; }
 
     [Required(ErrorMessage = "Description is required.")]

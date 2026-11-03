@@ -1,5 +1,4 @@
-﻿
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PayClaim.Entities;
 
@@ -13,6 +12,7 @@ public class EmployeeConfigurations : IEntityTypeConfiguration<Employee>
 
         builder.HasKey(e => e.Id);
 
+        // Properties
         builder.Property(e => e.Number)
             .IsRequired()
             .HasMaxLength(20);
@@ -34,24 +34,27 @@ public class EmployeeConfigurations : IEntityTypeConfiguration<Employee>
         builder.Property(e => e.DepartmentId)
             .HasColumnType("varchar(50)");
 
-        // Relationship with Position
+        // Unique Indexes
+        builder.HasIndex(e => e.Number)
+            .IsUnique();
+
+        builder.HasIndex(e => e.Email)
+            .IsUnique();
+
+        // Relationships
         builder.HasOne(e => e.Position)
             .WithMany()
             .HasForeignKey(e => e.PositionId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Relationship with Department
         builder.HasOne(e => e.Department)
             .WithMany()
             .HasForeignKey(e => e.DepartmentId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Self-referencing relationship with Manager
         builder.HasOne(e => e.Manager)
             .WithMany()
             .HasForeignKey(e => e.ManagerId)
             .OnDelete(DeleteBehavior.Restrict);
-
-
     }
 }

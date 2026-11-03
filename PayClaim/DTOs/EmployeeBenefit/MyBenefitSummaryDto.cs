@@ -20,5 +20,5 @@ public class MyBenefitSummaryDto
 
     public DateOnly EndDate { get; set; }
 
-    public bool IsActive => DateOnly.FromDateTime(DateTime.UtcNow) >= StartDate && DateOnly.FromDateTime(DateTime.UtcNow) <= EndDate;
+    public bool IsActive { get; set; }
 }

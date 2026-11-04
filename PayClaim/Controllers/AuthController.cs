@@ -27,7 +27,8 @@ public class AuthController(
     public async Task<IActionResult> GetMe(CancellationToken ct)
     {
         var accountIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) 
-            ?? User.FindFirstValue("AccountId");
+            ?? User.FindFirstValue("AccountId")
+            ?? User.FindFirst("sub")?.Value;
 
         if (string.IsNullOrEmpty(accountIdClaim) || !Guid.TryParse(accountIdClaim, out var accountId))
         {

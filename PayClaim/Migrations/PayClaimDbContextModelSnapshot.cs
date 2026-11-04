@@ -453,6 +453,11 @@ namespace PayClaim.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Destination")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
                     b.Property<DateOnly>("EndDate")
                         .HasColumnType("date");
 

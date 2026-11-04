@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace PayClaim.DTOs.TripProposal;
 
@@ -22,9 +23,7 @@ public class CreateTripProposalDto
     [StringLength(1000, ErrorMessage = "Description cannot exceed 1000 characters.")]
     public string Description { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "At least one participant is required.")]
-    [MinLength(1, ErrorMessage = "At least one participant is required.")]
     public List<ParticipantItemDto> Participants { get; set; } = new();
 
-    public Microsoft.AspNetCore.Http.IFormFile? File { get; set; }
+    public IFormFile? File { get; set; }
 }

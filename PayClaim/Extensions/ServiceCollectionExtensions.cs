@@ -1,8 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using PayClaim.Common.Security;
 using PayClaim.Data;
 using PayClaim.Data.Repositories;
 using PayClaim.Data.Repositories.Interfaces;
 using PayClaim.Data.UnitOfWork;
+using PayClaim.Features.Auth.Commands.Login;
+using PayClaim.Features.Auth.Queries.GetMe;
 using PayClaim.Features.Departments.Commands.UpdataDepartment;
 using PayClaim.Features.Departments.Queries.GetDepartment;
 using PayClaim.Features.Master.Departments.Commands.CreateDepartment;
@@ -26,9 +29,17 @@ public static class ServiceCollectionExtensions
 
         //repo
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        services.AddScoped<IAccountRepository, AccountRepository>();
 
         //uosw
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        //services
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
+
+        // Auth Handlers
+        services.AddScoped<LoginHandler>();
+        services.AddScoped<GetMeHandler>();
 
         //handler
         services.AddScoped<CreateDepartmentHandler>();

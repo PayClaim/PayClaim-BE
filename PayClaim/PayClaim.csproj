@@ -8,7 +8,6 @@
 
   <ItemGroup>
     <Compile Remove="Common\Middlewares\**" />
-    <Compile Remove="Features\Employees\**" />
     <Compile Remove="NewFolder\**" />
     <Content Remove="Common\Middlewares\**" />
     <Content Remove="Features\Employees\**" />
@@ -17,11 +16,11 @@
     <EmbeddedResource Remove="Features\Employees\**" />
     <EmbeddedResource Remove="NewFolder\**" />
     <None Remove="Common\Middlewares\**" />
-    <None Remove="Features\Employees\**" />
     <None Remove="NewFolder\**" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.14" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" Version="10.0.12" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
@@ -34,9 +33,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Controllers\" />
     <Folder Include="DTOs\" />
-    <Folder Include="Features\" />
     <Folder Include="Common\" />
   </ItemGroup>
 

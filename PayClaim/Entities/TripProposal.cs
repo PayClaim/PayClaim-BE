@@ -1,10 +1,12 @@
-﻿using PayClaim.Enums;
+using PayClaim.Enums;
 
 namespace PayClaim.Entities;
 
 public class TripProposal
 {
     public Guid Id { get; set; }
+
+    public string Destination { get; set; } = string.Empty;
 
     public DateOnly StartDate { get; set; }
 

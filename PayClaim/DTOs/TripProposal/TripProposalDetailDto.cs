@@ -6,6 +6,8 @@ public class TripProposalDetailDto
 {
     public Guid Id { get; set; }
 
+    public string Destination { get; set; } = string.Empty;
+
     public DateOnly StartDate { get; set; }
 
     public DateOnly EndDate { get; set; }

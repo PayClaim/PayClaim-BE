@@ -15,6 +15,9 @@ public class UnitOfWork : IUnitOfWork
     public IRepository<BenefitCategory> BenefitCategories { get; }
     public IRepository<Benefit> Benefits { get; }
     public IRepository<BenefitPlan> BenefitPlans { get; }
+    public IRepository<Account> Accounts { get; }
+    public IRepository<AccountRole> AccountRoles { get; }
+    public IRepository<EmployeeBenefit> EmployeeBenefits { get; }
 
     public UnitOfWork( PayClaimDbContext context, IEmployeeRepository employeeRepository)
     {
@@ -28,6 +31,9 @@ public class UnitOfWork : IUnitOfWork
         BenefitCategories = new Repository<BenefitCategory>(context);
         Benefits = new Repository<Benefit>(context);
         BenefitPlans = new Repository<BenefitPlan>(context);
+        Accounts = new Repository<Account>(context);
+        AccountRoles = new Repository<AccountRole>(context);
+        EmployeeBenefits = new Repository<EmployeeBenefit>(context);
     }
 
     public async Task<int> SaveChangesAsync( CancellationToken ct = default)

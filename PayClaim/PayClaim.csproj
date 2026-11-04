@@ -8,12 +8,16 @@
 
   <ItemGroup>
     <Compile Remove="Common\Middlewares\**" />
+    <Compile Remove="Features\Employees\**" />
     <Compile Remove="NewFolder\**" />
     <Content Remove="Common\Middlewares\**" />
+    <Content Remove="Features\Employees\**" />
     <Content Remove="NewFolder\**" />
     <EmbeddedResource Remove="Common\Middlewares\**" />
+    <EmbeddedResource Remove="Features\Employees\**" />
     <EmbeddedResource Remove="NewFolder\**" />
     <None Remove="Common\Middlewares\**" />
+    <None Remove="Features\Employees\**" />
     <None Remove="NewFolder\**" />
   </ItemGroup>
 
@@ -32,11 +36,6 @@
   <ItemGroup>
     <Folder Include="Controllers\" />
     <Folder Include="DTOs\" />
-    <Folder Include="Features\Employees\Commands\CreateEmployee\" />
-    <Folder Include="Features\Employees\Commands\DeleteEmployee\" />
-    <Folder Include="Features\Employees\Commands\UpdateEmployee\" />
-    <Folder Include="Features\Employees\Queries\GetEmployees\" />
-    <Folder Include="Features\Employees\Queries\GetEmployeeById\" />
     <Folder Include="Features\" />
     <Folder Include="Common\" />
   </ItemGroup>

@@ -20,6 +20,7 @@ public class UnitOfWork : IUnitOfWork
     public IRepository<AccountRole> AccountRoles { get; }
     public IRepository<EmployeeBenefit> EmployeeBenefits { get; }
 
+    public UnitOfWork( PayClaimDbContext context, IEmployeeRepository employeeRepository)
     public UnitOfWork(
         PayClaimDbContext context,
         IEmployeeRepository employeeRepository,
@@ -28,6 +29,8 @@ public class UnitOfWork : IUnitOfWork
         _context = context;
 
         Employees = employeeRepository;
+
+        //ga butuh pengecheckan khusus makanya langsung di sini sidepartment
         Accounts = accountRepository;
         Departments = new Repository<Department>(context);
         Positions = new Repository<Position>(context);
@@ -39,6 +42,7 @@ public class UnitOfWork : IUnitOfWork
         EmployeeBenefits = new Repository<EmployeeBenefit>(context);
     }
 
+    public async Task<int> SaveChangesAsync( CancellationToken ct = default)
     {
         return await _context.SaveChangesAsync(ct);
     }

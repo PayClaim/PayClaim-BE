@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Compile Remove="Common\Middlewares\**" />
+    <Compile Remove="Features\Employees\**" />
     <Compile Remove="NewFolder\**" />
     <Content Remove="Common\Middlewares\**" />
     <Content Remove="Features\Employees\**" />
@@ -16,6 +17,7 @@
     <EmbeddedResource Remove="Features\Employees\**" />
     <EmbeddedResource Remove="NewFolder\**" />
     <None Remove="Common\Middlewares\**" />
+    <None Remove="Features\Employees\**" />
     <None Remove="NewFolder\**" />
   </ItemGroup>
 

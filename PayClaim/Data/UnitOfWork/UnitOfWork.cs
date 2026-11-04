@@ -10,6 +10,7 @@ public class UnitOfWork : IUnitOfWork
     private readonly PayClaimDbContext _context;
 
     public IEmployeeRepository Employees { get; }
+    public IAccountRepository Accounts { get; }
     public IRepository<Department> Departments { get; }
     public IRepository<Position> Positions { get; }
     public IRepository<BenefitCategory> BenefitCategories { get; }
@@ -20,12 +21,17 @@ public class UnitOfWork : IUnitOfWork
     public IRepository<EmployeeBenefit> EmployeeBenefits { get; }
 
     public UnitOfWork( PayClaimDbContext context, IEmployeeRepository employeeRepository)
+    public UnitOfWork(
+        PayClaimDbContext context,
+        IEmployeeRepository employeeRepository,
+        IAccountRepository accountRepository)
     {
         _context = context;
 
         Employees = employeeRepository;
 
         //ga butuh pengecheckan khusus makanya langsung di sini sidepartment
+        Accounts = accountRepository;
         Departments = new Repository<Department>(context);
         Positions = new Repository<Position>(context);
         BenefitCategories = new Repository<BenefitCategory>(context);

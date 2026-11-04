@@ -4,6 +4,10 @@ namespace PayClaim.DTOs.TripProposal;
 
 public class CreateTripProposalDto
 {
+    [Required(ErrorMessage = "Destination is required.")]
+    [StringLength(150, ErrorMessage = "Destination cannot exceed 150 characters.")]
+    public string Destination { get; set; } = string.Empty;
+
     [Required(ErrorMessage = "Start date is required.")]
     public DateOnly StartDate { get; set; }
 

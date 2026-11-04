@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PayClaim.Entities;
 
@@ -12,6 +12,10 @@ public class TripProposalConfigurations
         builder.ToTable("Trip_proposals");
 
         builder.HasKey(tp => tp.Id);
+
+        builder.Property(tp => tp.Destination)
+            .HasMaxLength(150)
+            .IsRequired();
 
         builder.Property(tp => tp.StartDate)
             .HasColumnType("date")

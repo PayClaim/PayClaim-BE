@@ -27,15 +27,15 @@ public static class DbInitializer
         // 2. Seed Departments
         if (!await context.Departments.AnyAsync())
         {
-            var hq = new Department { Id = "DEPT-HQ", Name = "Headquarter", ParentDepartmentId = null };
+            var hq = new Department { Id = "HQ", Name = "Headquarter", ParentDepartmentId = null };
             await context.Departments.AddAsync(hq);
             await context.SaveChangesAsync();
 
             var subDepts = new List<Department>
             {
-                new() { Id = "DEPT-ENG", Name = "Engineering", ParentDepartmentId = "DEPT-HQ" },
-                new() { Id = "DEPT-FIN", Name = "Finance & Accounting", ParentDepartmentId = "DEPT-HQ" },
-                new() { Id = "DEPT-HR", Name = "Human Resources", ParentDepartmentId = "DEPT-HQ" }
+                new() { Id = "ENG", Name = "Engineering", ParentDepartmentId = "HQ" },
+                new() { Id = "FIN", Name = "Finance & Accounting", ParentDepartmentId = "HQ" },
+                new() { Id = "HR", Name = "Human Resources", ParentDepartmentId = "HQ" }
             };
             await context.Departments.AddRangeAsync(subDepts);
             await context.SaveChangesAsync();
@@ -46,12 +46,12 @@ public static class DbInitializer
         {
             var positions = new List<Position>
             {
-                new() { Id = "POS-DIR", Title = "Director" },
-                new() { Id = "POS-MGR-ENG", Title = "Engineering Manager" },
-                new() { Id = "POS-MGR-FIN", Title = "Finance Manager" },
-                new() { Id = "POS-ENG-L5", Title = "Staff Software Engineer" },
-                new() { Id = "POS-ENG-L3", Title = "Junior Software Engineer" },
-                new() { Id = "POS-FIN-L3", Title = "Finance Specialist" }
+                new() { Id = "DIR", Title = "Director" },
+                new() { Id = "MGR", Title = "Manager" },
+                new() { Id = "L4", Title = "Senior" },
+                new() { Id = "L3", Title = "Staff" },
+                new() { Id = "L2", Title = "Junior" },
+                new() { Id = "L1", Title = "Intern" }
             };
             await context.Positions.AddRangeAsync(positions);
             await context.SaveChangesAsync();
@@ -71,8 +71,8 @@ public static class DbInitializer
                 FullName = "Rina Wijaya",
                 Email = "admin@perusahaan.co.id",
                 IsActive = true,
-                DepartmentId = "DEPT-HR",
-                PositionId = "POS-DIR",
+                DepartmentId = "HR",
+                PositionId = "DIR",
                 ManagerId = null
             };
             var adminAcc = new Account
@@ -99,8 +99,8 @@ public static class DbInitializer
                 FullName = "Andi Pratama",
                 Email = "andi.pratama@perusahaan.co.id",
                 IsActive = true,
-                DepartmentId = "DEPT-ENG",
-                PositionId = "POS-MGR-ENG",
+                DepartmentId = "ENG",
+                PositionId = "MGR",
                 ManagerId = null
             };
             var managerAcc = new Account
@@ -126,8 +126,8 @@ public static class DbInitializer
                 FullName = "Budi Santoso",
                 Email = "budi.santoso@perusahaan.co.id",
                 IsActive = true,
-                DepartmentId = "DEPT-ENG",
-                PositionId = "POS-ENG-L5",
+                DepartmentId = "ENG",
+                PositionId = "L4",
                 ManagerId = managerEmpId
             };
             var budiAcc = new Account
@@ -154,8 +154,8 @@ public static class DbInitializer
                 FullName = "Dewi Lestari",
                 Email = "dewi.lestari@perusahaan.co.id",
                 IsActive = true,
-                DepartmentId = "DEPT-FIN",
-                PositionId = "POS-MGR-FIN",
+                DepartmentId = "FIN",
+                PositionId = "MGR",
                 ManagerId = null
             };
             var financeAcc = new Account
@@ -240,9 +240,9 @@ public static class DbInitializer
 
             var plans = new List<BenefitPlan>
             {
-                new() { DepartmentId = "DEPT-ENG", PositionId = "POS-ENG-L5", BenefitId = benefit1, LimitAmount = 10000000.00m },
-                new() { DepartmentId = "DEPT-ENG", PositionId = "POS-ENG-L5", BenefitId = benefit2, LimitAmount = 2000000.00m },
-                new() { DepartmentId = "DEPT-ENG", PositionId = "POS-ENG-L5", BenefitId = benefit3, LimitAmount = 500000.00m }
+                new() { DepartmentId = "ENG", PositionId = "L4", BenefitId = benefit1, LimitAmount = 10000000.00m },
+                new() { DepartmentId = "ENG", PositionId = "L4", BenefitId = benefit2, LimitAmount = 2000000.00m },
+                new() { DepartmentId = "ENG", PositionId = "L4", BenefitId = benefit3, LimitAmount = 500000.00m }
             };
             await context.BenefitPlans.AddRangeAsync(plans);
             await context.SaveChangesAsync();

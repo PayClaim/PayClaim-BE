@@ -13,7 +13,6 @@ public interface IUnitOfWork
     IRepository<BenefitCategory> BenefitCategories { get; }
     IRepository<Benefit> Benefits { get; }
     IRepository<BenefitPlan> BenefitPlans { get; }
-    IRepository<Account> Accounts { get; }
     IRepository<AccountRole> AccountRoles { get; }
     IRepository<EmployeeBenefit> EmployeeBenefits { get; }
 

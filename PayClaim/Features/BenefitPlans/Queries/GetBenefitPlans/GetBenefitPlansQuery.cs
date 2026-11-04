@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿
+using Microsoft.EntityFrameworkCore;
 using PayClaim.Data;
 using PayClaim.DTOs.Master;
 
@@ -8,7 +9,7 @@ public record GetBenefitPlansQuery();
 
 public class GetBenefitPlansHandler(PayClaimDbContext db)
 {
-    public async Task<List<BenefitPlanDto>> Handle( GetBenefitPlansQuery query, CancellationToken ct)
+    public async Task<List<BenefitPlanDto>> Handle(GetBenefitPlansQuery query, CancellationToken ct)
     {
         return await db.BenefitPlans
             .AsNoTracking()
@@ -17,8 +18,14 @@ public class GetBenefitPlansHandler(PayClaimDbContext db)
             .Select(bp => new BenefitPlanDto
             {
                 DepartmentId = bp.DepartmentId,
+                DepartmentName = bp.Department.Name,
+
                 PositionId = bp.PositionId,
+                PositionTitle = bp.Position.Title,
+
                 BenefitId = bp.BenefitId,
+                BenefitName = bp.Benefit.Name,
+
                 LimitAmount = bp.LimitAmount
             })
             .ToListAsync(ct);

@@ -8,6 +8,7 @@ public interface IUnitOfWork
 {
     IEmployeeRepository Employees { get; }
     IRepository<Department> Departments { get; }
+    IRepository<Position> Positions { get; }
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

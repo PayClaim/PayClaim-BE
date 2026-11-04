@@ -11,6 +11,7 @@ public class UnitOfWork : IUnitOfWork
 
     public IEmployeeRepository Employees { get; }
     public IRepository<Department> Departments { get; }
+    public IRepository<Position> Positions { get; }
 
     public UnitOfWork( PayClaimDbContext context, IEmployeeRepository employeeRepository)
     {
@@ -20,6 +21,7 @@ public class UnitOfWork : IUnitOfWork
 
         //ga butuh pengecheckan khusus makanya langsung di sini sidepartment
         Departments = new Repository<Department>(context);
+        Positions = new Repository<Position>(context);
     }
 
     public async Task<int> SaveChangesAsync( CancellationToken ct = default)

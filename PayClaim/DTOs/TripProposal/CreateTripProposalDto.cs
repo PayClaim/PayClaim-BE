@@ -25,4 +25,6 @@ public class CreateTripProposalDto
     [Required(ErrorMessage = "At least one participant is required.")]
     [MinLength(1, ErrorMessage = "At least one participant is required.")]
     public List<ParticipantItemDto> Participants { get; set; } = new();
+
+    public Microsoft.AspNetCore.Http.IFormFile? File { get; set; }
 }

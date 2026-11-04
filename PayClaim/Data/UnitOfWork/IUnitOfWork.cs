@@ -1,4 +1,4 @@
-﻿using PayClaim.Data.Repositories.Interfaces;
+using PayClaim.Data.Repositories.Interfaces;
 using PayClaim.Entities;
 
 namespace PayClaim.Data.UnitOfWork;
@@ -15,6 +15,9 @@ public interface IUnitOfWork
     IRepository<Benefit> Benefits { get; }
     IRepository<AccountRole> AccountRoles { get; }
     IRepository<EmployeeBenefit> EmployeeBenefits { get; }
+    ITripProposalRepository TripProposals { get; }
+    IRepository<TripApproval> TripApprovals { get; }
+    IRepository<ProposalParticipant> ProposalParticipants { get; }
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

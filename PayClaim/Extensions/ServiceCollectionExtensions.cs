@@ -1,5 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Security;
+using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.Data.Repositories;
 using PayClaim.Data.Repositories.Interfaces;
@@ -27,6 +28,10 @@ using PayClaim.Features.Positions.Commands.DeletePosition;
 using PayClaim.Features.Positions.Commands.UpdatePosition;
 using PayClaim.Features.Positions.Queries.GetPositionById;
 using PayClaim.Features.Positions.Queries.GetPositions;
+using PayClaim.Features.TripProposals.Commands.ApproveTripProposal;
+using PayClaim.Features.TripProposals.Commands.CreateTripProposal;
+using PayClaim.Features.TripProposals.Queries.GetTripProposalById;
+using PayClaim.Features.TripProposals.Queries.GetTripProposals;
 
 namespace PayClaim.Extensions;
 
@@ -47,18 +52,26 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<IBenefitPlanRepository, BenefitPlanRepository>();
+        services.AddScoped<ITripProposalRepository, TripProposalRepository>();
 
         // Unit of Work
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Services
         services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<IFileStorageService, FileStorageService>();
 
         // Auth Handlers
         services.AddScoped<LoginHandler>();
         services.AddScoped<GetMeHandler>();
 
-        // Department Handlers
+        // Trip Proposal Handlers
+        services.AddScoped<CreateTripProposalHandler>();
+        services.AddScoped<GetTripProposalsHandler>();
+        services.AddScoped<GetTripProposalByIdHandler>();
+        services.AddScoped<ApproveTripProposalHandler>();
+
+        //handler
         services.AddScoped<CreateDepartmentHandler>();
         services.AddScoped<GetDepartmentsHandler>();
         services.AddScoped<GetDepartmentByIdQueryHandler>();

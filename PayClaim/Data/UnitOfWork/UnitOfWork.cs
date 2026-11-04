@@ -1,4 +1,4 @@
-﻿using PayClaim.Data.Repositories.Interfaces;
+using PayClaim.Data.Repositories.Interfaces;
 using PayClaim.Entities;
 
 namespace PayClaim.Data.UnitOfWork;
@@ -13,7 +13,10 @@ public class UnitOfWork(
     IRepository<BenefitCategory> benefitCategories,
     IRepository<Benefit> benefits,
     IRepository<AccountRole> accountRoles,
-    IRepository<EmployeeBenefit> employeeBenefits
+    IRepository<EmployeeBenefit> employeeBenefits,
+    ITripProposalRepository tripProposals,
+    IRepository<TripApproval> tripApprovals,
+    IRepository<ProposalParticipant> proposalParticipants
 ) : IUnitOfWork
 {
     public IEmployeeRepository Employees { get; } = employees;
@@ -26,6 +29,9 @@ public class UnitOfWork(
     public IRepository<Benefit> Benefits { get; } = benefits;
     public IRepository<AccountRole> AccountRoles { get; } = accountRoles;
     public IRepository<EmployeeBenefit> EmployeeBenefits { get; } = employeeBenefits;
+    public ITripProposalRepository TripProposals { get; } = tripProposals;
+    public IRepository<TripApproval> TripApprovals { get; } = tripApprovals;
+    public IRepository<ProposalParticipant> ProposalParticipants { get; } = proposalParticipants;
 
     public Task<int> SaveChangesAsync(CancellationToken ct = default)
         => context.SaveChangesAsync(ct);

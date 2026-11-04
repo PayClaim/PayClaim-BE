@@ -8,13 +8,9 @@
 
   <ItemGroup>
     <Compile Remove="Common\Middlewares\**" />
-    <Compile Remove="NewFolder\**" />
     <Content Remove="Common\Middlewares\**" />
-    <Content Remove="NewFolder\**" />
     <EmbeddedResource Remove="Common\Middlewares\**" />
-    <EmbeddedResource Remove="NewFolder\**" />
     <None Remove="Common\Middlewares\**" />
-    <None Remove="NewFolder\**" />
   </ItemGroup>
 
   <ItemGroup>

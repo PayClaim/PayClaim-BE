@@ -1,4 +1,3 @@
-﻿
 using PayClaim.Data.Repositories;
 using PayClaim.Data.Repositories.Interfaces;
 using PayClaim.Entities;
@@ -18,18 +17,22 @@ public class UnitOfWork : IUnitOfWork
     public IRepository<BenefitPlan> BenefitPlans { get; }
     public IRepository<AccountRole> AccountRoles { get; }
     public IRepository<EmployeeBenefit> EmployeeBenefits { get; }
+    public ITripProposalRepository TripProposals { get; }
+    public IRepository<TripApproval> TripApprovals { get; }
+    public IRepository<ProposalParticipant> ProposalParticipants { get; }
 
     public UnitOfWork(
         PayClaimDbContext context,
         IEmployeeRepository employeeRepository,
-        IAccountRepository accountRepository)
+        IAccountRepository accountRepository,
+        ITripProposalRepository tripProposalRepository)
     {
         _context = context;
 
         Employees = employeeRepository;
         Accounts = accountRepository;
+        TripProposals = tripProposalRepository;
 
-        //ga butuh pengecheckan khusus makanya langsung di sini sidepartment
         Departments = new Repository<Department>(context);
         Positions = new Repository<Position>(context);
         BenefitCategories = new Repository<BenefitCategory>(context);
@@ -37,9 +40,11 @@ public class UnitOfWork : IUnitOfWork
         BenefitPlans = new Repository<BenefitPlan>(context);
         AccountRoles = new Repository<AccountRole>(context);
         EmployeeBenefits = new Repository<EmployeeBenefit>(context);
+        TripApprovals = new Repository<TripApproval>(context);
+        ProposalParticipants = new Repository<ProposalParticipant>(context);
     }
 
-    public async Task<int> SaveChangesAsync( CancellationToken ct = default)
+    public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {
         return await _context.SaveChangesAsync(ct);
     }

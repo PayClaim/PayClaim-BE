@@ -8,6 +8,7 @@ using PayClaim.Data;
 using PayClaim.Data.Repositories;
 using PayClaim.Data.Repositories.Interfaces;
 using PayClaim.Data.UnitOfWork;
+using PayClaim.Features.Auth.Commands.Login;
 using PayClaim.Features.Master.Departments.Commands.CreateDepartment;
 using PayClaim.Features.Master.Departments.Queries.GetDepartments;
 
@@ -32,6 +33,7 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
 // Handlers
+builder.Services.AddScoped<LoginHandler>();
 builder.Services.AddScoped<CreateDepartmentHandler>();
 builder.Services.AddScoped<GetDepartmentsHandler>();
 

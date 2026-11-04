@@ -23,12 +23,12 @@ namespace PayClaim.Data.Repositories
 
         public void Delete(TEntity entity)
         {
-            _dbSet.Update(entity);
+            _dbSet.Remove(entity);
         }
 
         public void Update(TEntity entity)
         {
-            _dbSet.Remove(entity);
+            _dbSet.Update(entity);
         }
     }
 }

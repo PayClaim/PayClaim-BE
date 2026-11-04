@@ -1,46 +1,32 @@
-﻿
-using PayClaim.Data.Repositories;
-using PayClaim.Data.Repositories.Interfaces;
+﻿using PayClaim.Data.Repositories.Interfaces;
 using PayClaim.Entities;
 
 namespace PayClaim.Data.UnitOfWork;
 
-public class UnitOfWork : IUnitOfWork
+public class UnitOfWork(
+    PayClaimDbContext context,
+    IEmployeeRepository employees,
+    IAccountRepository accounts,
+    IBenefitPlanRepository benefitPlans,
+    IRepository<Department> departments,
+    IRepository<Position> positions,
+    IRepository<BenefitCategory> benefitCategories,
+    IRepository<Benefit> benefits,
+    IRepository<AccountRole> accountRoles,
+    IRepository<EmployeeBenefit> employeeBenefits
+) : IUnitOfWork
 {
-    private readonly PayClaimDbContext _context;
+    public IEmployeeRepository Employees { get; } = employees;
+    public IAccountRepository Accounts { get; } = accounts;
+    public IBenefitPlanRepository BenefitPlans { get; } = benefitPlans;
 
-    public IEmployeeRepository Employees { get; }
-    public IAccountRepository Accounts { get; }
-    public IRepository<Department> Departments { get; }
-    public IRepository<Position> Positions { get; }
-    public IRepository<BenefitCategory> BenefitCategories { get; }
-    public IRepository<Benefit> Benefits { get; }
-    public IRepository<BenefitPlan> BenefitPlans { get; }
-    public IRepository<AccountRole> AccountRoles { get; }
-    public IRepository<EmployeeBenefit> EmployeeBenefits { get; }
+    public IRepository<Department> Departments { get; } = departments;
+    public IRepository<Position> Positions { get; } = positions;
+    public IRepository<BenefitCategory> BenefitCategories { get; } = benefitCategories;
+    public IRepository<Benefit> Benefits { get; } = benefits;
+    public IRepository<AccountRole> AccountRoles { get; } = accountRoles;
+    public IRepository<EmployeeBenefit> EmployeeBenefits { get; } = employeeBenefits;
 
-    public UnitOfWork(
-        PayClaimDbContext context,
-        IEmployeeRepository employeeRepository,
-        IAccountRepository accountRepository)
-    {
-        _context = context;
-
-        Employees = employeeRepository;
-        Accounts = accountRepository;
-
-        //ga butuh pengecheckan khusus makanya langsung di sini sidepartment
-        Departments = new Repository<Department>(context);
-        Positions = new Repository<Position>(context);
-        BenefitCategories = new Repository<BenefitCategory>(context);
-        Benefits = new Repository<Benefit>(context);
-        BenefitPlans = new Repository<BenefitPlan>(context);
-        AccountRoles = new Repository<AccountRole>(context);
-        EmployeeBenefits = new Repository<EmployeeBenefit>(context);
-    }
-
-    public async Task<int> SaveChangesAsync( CancellationToken ct = default)
-    {
-        return await _context.SaveChangesAsync(ct);
-    }
+    public Task<int> SaveChangesAsync(CancellationToken ct = default)
+        => context.SaveChangesAsync(ct);
 }

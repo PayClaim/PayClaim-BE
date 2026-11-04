@@ -8,16 +8,12 @@
 
   <ItemGroup>
     <Compile Remove="Common\Middlewares\**" />
-    <Compile Remove="Features\Employees\**" />
     <Compile Remove="NewFolder\**" />
     <Content Remove="Common\Middlewares\**" />
-    <Content Remove="Features\Employees\**" />
     <Content Remove="NewFolder\**" />
     <EmbeddedResource Remove="Common\Middlewares\**" />
-    <EmbeddedResource Remove="Features\Employees\**" />
     <EmbeddedResource Remove="NewFolder\**" />
     <None Remove="Common\Middlewares\**" />
-    <None Remove="Features\Employees\**" />
     <None Remove="NewFolder\**" />
   </ItemGroup>
 
@@ -37,6 +33,8 @@
   <ItemGroup>
     <Folder Include="DTOs\" />
     <Folder Include="Common\" />
+    <Folder Include="Features\Employees\Commands\UpdateEmployee\" />
+    <Folder Include="Features\Employees\Commands\DeleteEmployee\" />
   </ItemGroup>
 
 </Project>

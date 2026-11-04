@@ -12,7 +12,7 @@ public class EmployeeDto
     public string FullName { get; set; } = string.Empty;
 
     public string Email { get; set; } = string.Empty;
-
+    public DateOnly HireDate { get; set; }
     public bool IsActive { get; set; }
 
     public string PositionId { get; set; } = string.Empty;
@@ -42,6 +42,10 @@ public class CreateEmployeeDto
     [EmailAddress(ErrorMessage = "Invalid email address format.")]
     [StringLength(100, ErrorMessage = "Email cannot exceed 100 characters.")]
     public string Email { get; set; } = string.Empty;
+
+    [Required]
+    public DateOnly HireDate { get; set; }
+
 
     [Required(ErrorMessage = "Position ID is required.")]
     [StringLength(50, ErrorMessage = "Position ID cannot exceed 50 characters.")]
@@ -77,6 +81,9 @@ public class UpdateEmployeeDto
     [EmailAddress(ErrorMessage = "Invalid email address format.")]
     [StringLength(100, ErrorMessage = "Email cannot exceed 100 characters.")]
     public string Email { get; set; } = string.Empty;
+
+    [Required]
+    public DateOnly HireDate { get; set; }
 
     [Required(ErrorMessage = "Position ID is required.")]
     public string PositionId { get; set; } = string.Empty;

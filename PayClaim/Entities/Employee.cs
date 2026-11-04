@@ -9,9 +9,9 @@ public class Employee
     public string FullName { get; set; } = string.Empty;
 
     public string Email { get; set; } = string.Empty;
+    public DateOnly HireDate { get; set; }
 
     public bool IsActive { get; set; }
-
 
     // Foreign Keys
     public string PositionId { get; set; } = string.Empty;

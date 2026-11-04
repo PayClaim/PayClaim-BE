@@ -25,6 +25,10 @@ public class EmployeeConfigurations : IEntityTypeConfiguration<Employee>
             .IsRequired()
             .HasMaxLength(254);
 
+        builder.Property(e => e.HireDate)
+            .HasColumnType("date")
+            .IsRequired();
+
         builder.Property(e => e.IsActive)
             .IsRequired();
 
@@ -33,7 +37,6 @@ public class EmployeeConfigurations : IEntityTypeConfiguration<Employee>
 
         builder.Property(e => e.DepartmentId)
             .HasColumnType("varchar(50)");
-
         // Unique Indexes
         builder.HasIndex(e => e.Number)
             .IsUnique();
@@ -56,5 +59,6 @@ public class EmployeeConfigurations : IEntityTypeConfiguration<Employee>
             .WithMany()
             .HasForeignKey(e => e.ManagerId)
             .OnDelete(DeleteBehavior.Restrict);
+
     }
 }

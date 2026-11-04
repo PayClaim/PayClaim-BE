@@ -1,10 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Security;
 using PayClaim.Data;
 using PayClaim.Data.Repositories;
 using PayClaim.Data.Repositories.Interfaces;
 using PayClaim.Data.UnitOfWork;
+using PayClaim.Features.Auth.Commands.Login;
+using PayClaim.Features.Auth.Queries.GetMe;
 using PayClaim.Features.BenefitCategories.Commands.CreateBenefitCategory;
 using PayClaim.Features.BenefitCategories.Commands.DeleteBenefitCategory;
 using PayClaim.Features.BenefitCategories.Commands.UpdateBenefitCategory;
@@ -14,10 +15,10 @@ using PayClaim.Features.BenefitPlans.Commands;
 using PayClaim.Features.BenefitPlans.Queries;
 using PayClaim.Features.Benefits.Commands;
 using PayClaim.Features.Benefits.Queries;
-using PayClaim.Features.Auth.Commands.Login;
-using PayClaim.Features.Auth.Queries.GetMe;
 using PayClaim.Features.Departments.Commands.UpdataDepartment;
 using PayClaim.Features.Departments.Queries.GetDepartment;
+using PayClaim.Features.Employees.Queries.GetEmployeeById;
+using PayClaim.Features.Employees.Queries.GetEmployees;
 using PayClaim.Features.Master.Departments.Commands.CreateDepartment;
 using PayClaim.Features.Master.Departments.Commands.DeleteDepartment;
 using PayClaim.Features.Master.Departments.Queries.GetDepartmentById;
@@ -31,27 +32,33 @@ namespace PayClaim.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddPayClaimServices(this IServiceCollection services, IConfiguration config)
+    public static IServiceCollection AddPayClaimServices(
+        this IServiceCollection services,
+        IConfiguration config)
     {
-        //db
-        services.AddDbContext<PayClaimDbContext>(options => options.UseSqlServer(
-            config.GetConnectionString("DefaultConnection")));
+        // Database
+        services.AddDbContext<PayClaimDbContext>(options =>
+            options.UseSqlServer(config.GetConnectionString("DefaultConnection")));
 
-        //repo
+        // Generic Repository
+        services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+
+        // Specific Repositories
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IAccountRepository, AccountRepository>();
+        services.AddScoped<IBenefitPlanRepository, BenefitPlanRepository>();
 
-        //uosw
+        // Unit of Work
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-        //services
+        // Services
         services.AddScoped<IJwtTokenService, JwtTokenService>();
 
         // Auth Handlers
         services.AddScoped<LoginHandler>();
         services.AddScoped<GetMeHandler>();
 
-        //handler
+        // Department Handlers
         services.AddScoped<CreateDepartmentHandler>();
         services.AddScoped<GetDepartmentsHandler>();
         services.AddScoped<GetDepartmentByIdQueryHandler>();
@@ -85,6 +92,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<GetBenefitPlanByIdHandler>();
         services.AddScoped<UpdateBenefitPlanHandler>();
         services.AddScoped<DeleteBenefitPlanHandler>();
+
+        // Employee Handlers
+        services.AddScoped<GetEmployeesHandler>();
+        services.AddScoped<GetEmployeeByIdHandler>();
+
         return services;
     }
 }

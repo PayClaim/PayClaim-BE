@@ -272,6 +272,9 @@ namespace PayClaim.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<DateOnly>("HireDate")
+                        .HasColumnType("date");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 

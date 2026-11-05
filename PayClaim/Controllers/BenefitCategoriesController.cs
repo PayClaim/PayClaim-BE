@@ -5,6 +5,7 @@ using PayClaim.Features.BenefitCategories.Commands.UpdateBenefitCategory;
 using PayClaim.Features.BenefitCategories.Commands.DeleteBenefitCategory;
 using PayClaim.Features.BenefitCategories.Queries.GetBenefitCategories;
 using PayClaim.Features.BenefitCategories.Queries.GetBenefitCategoryById;
+using Microsoft.AspNetCore.Authorization;
 
 namespace PayClaim.Controllers;
 
@@ -13,6 +14,7 @@ namespace PayClaim.Controllers;
 public class BenefitCategoriesController(CreateBenefitCategoryHandler createHandler, GetBenefitCategoriesHandler getAllHandler, GetBenefitCategoryByIdQueryHandler getByIdHandler,
     UpdateBenefitCategoryHandler updateHandler, DeleteBenefitCategoryHandler deleteHandler) : ControllerBase
 {
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<BenefitCategoryDto>>> GetAll(CancellationToken ct)
     {
@@ -22,6 +24,7 @@ public class BenefitCategoriesController(CreateBenefitCategoryHandler createHand
         return Ok(categories);
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpGet("{id:int}")]
     public async Task<ActionResult<BenefitCategoryDto>> GetById(
         int id,
@@ -33,6 +36,7 @@ public class BenefitCategoriesController(CreateBenefitCategoryHandler createHand
         return Ok(category);
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<IActionResult> Create(
         [FromBody] CreateBenefitCategoryDto request,
@@ -44,6 +48,7 @@ public class BenefitCategoriesController(CreateBenefitCategoryHandler createHand
         return Created($"/api/benefitcategories/{id}", new { id });
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(
         int id,
@@ -56,6 +61,7 @@ public class BenefitCategoriesController(CreateBenefitCategoryHandler createHand
         return Ok("Benefit category updated successfully.");
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(
         int id,

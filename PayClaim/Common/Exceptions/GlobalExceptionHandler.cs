@@ -18,6 +18,7 @@ namespace PayClaim.Common.Exceptions
             {
                 NotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),
                 ConflictException => (StatusCodes.Status409Conflict, "Conflict occurred"),
+                ForbiddenException => (StatusCodes.Status403Forbidden,"Forbidden"),
                 BusinessRuleException => (StatusCodes.Status400BadRequest, "Business rule violation"),
                 _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred")
             };

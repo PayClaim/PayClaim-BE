@@ -26,5 +26,5 @@ public class CreateClaimDto
 
     public IFormFile? ReceiptFile { get; set; }
 
-    public Guid? EmployeeId { get; set; }
+    //public Guid? EmployeeId { get; set; }
 }

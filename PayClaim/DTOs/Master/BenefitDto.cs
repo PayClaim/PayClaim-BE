@@ -65,27 +65,3 @@ public class UpdateBenefitDto
     [Required(ErrorMessage = "Category ID is required.")]
     public int CategoryId { get; set; }
 }
-
-public class BenefitIdResponseDto
-{
-    public Guid Id { get; set; }
-
-    public BenefitIdResponseDto() { }
-
-    public BenefitIdResponseDto(Guid id)
-    {
-        Id = id;
-    }
-}
-
-public class BenefitMessageResponseDto
-{
-    public string Message { get; set; } = string.Empty;
-
-    public BenefitMessageResponseDto() { }
-
-    public BenefitMessageResponseDto(string message)
-    {
-        Message = message;
-    }
-}

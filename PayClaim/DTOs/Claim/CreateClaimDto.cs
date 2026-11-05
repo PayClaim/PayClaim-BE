@@ -1,11 +1,12 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 using PayClaim.Enums;
 
 namespace PayClaim.DTOs.Claim;
 
 public class CreateClaimDto
 {
-    [EnumDataType(typeof(ClaimType))]
+    [Required(ErrorMessage = "Claim type is required.")]
     public ClaimType ClaimType { get; set; }
 
     [Required(ErrorMessage = "Description is required.")]
@@ -22,4 +23,8 @@ public class CreateClaimDto
     public Guid? EmployeeBenefitId { get; set; }
 
     public Guid? TripProposalId { get; set; }
+
+    public IFormFile? ReceiptFile { get; set; }
+
+    public Guid? EmployeeId { get; set; }
 }

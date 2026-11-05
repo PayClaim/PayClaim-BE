@@ -30,13 +30,17 @@ public class RejectClaimHandler
             throw new NotFoundException($"Claim with ID '{command.ClaimId}' was not found.");
         }
 
-        // 2. Validasi status klaim
+        // 2. Validasi status klaim yang berhak ditolak
         if (claim.Status != ClaimStatus.Submitted && claim.Status != ClaimStatus.UnderReview)
         {
             throw new BusinessRuleException($"Cannot reject a claim that is already in '{claim.Status}' status.");
         }
 
-        // 3. Resolusi Approver
+        // 3. Tentukan level penolakan (Level 1 Manager jika Submitted, Level 2 Finance jika UnderReview)
+        byte currentLevel = claim.Status == ClaimStatus.Submitted ? (byte)1 : (byte)2;
+        string approverRoleKeyword = currentLevel == 1 ? "Manager" : "Finance";
+
+        // 4. Resolusi Approver
         var approverId = command.Request.ApproverId ?? command.LoggedInApproverId;
         Employee? approver = null;
 
@@ -47,19 +51,18 @@ public class RejectClaimHandler
 
         if (approver == null)
         {
-            // Fallback untuk kemudahan development: cari manager/lead/finance atau employee pertama
             approver = await _context.Employees
                 .Include(e => e.Position)
-                .FirstOrDefaultAsync(e => e.Position.Title.Contains("Manager") || e.Position.Title.Contains("Lead") || e.Position.Title.Contains("Finance"), ct)
+                .FirstOrDefaultAsync(e => e.Position.Title.Contains(approverRoleKeyword) || e.Position.Title.Contains("Lead") || e.Position.Title.Contains("Director"), ct)
                 ?? await _context.Employees.FirstOrDefaultAsync(ct);
 
             if (approver == null)
             {
-                throw new NotFoundException("No eligible approver found in the system.");
+                throw new NotFoundException($"No eligible approver ({approverRoleKeyword}) found in the system.");
             }
         }
 
-        // 4. Tentukan keputusan (Rejected atau NeedsRevision)
+        // 5. Tentukan keputusan (Rejected atau NeedsRevision)
         var decision = command.Request.Decision == ApprovalDecision.NeedsRevision
             ? ApprovalDecision.NeedsRevision
             : ApprovalDecision.Rejected;
@@ -70,7 +73,7 @@ public class RejectClaimHandler
 
         _uow.Claims.Update(claim);
 
-        // 5. Buat riwayat jejak approval (audit trail)
+        // 6. Buat riwayat jejak approval (audit trail)
         var approvalRecord = new ClaimApproval
         {
             ClaimId = claim.Id,
@@ -78,13 +81,13 @@ public class RejectClaimHandler
             ApproverName = approver.FullName,
             Decision = decision,
             Notes = command.Request.Notes,
-            ApprovalLevel = 1,
+            ApprovalLevel = currentLevel,
             DecidedAt = DateTime.UtcNow
         };
 
         await _uow.ClaimApprovals.AddAsync(approvalRecord, ct);
 
-        // 6. Simpan seluruh perubahan
+        // 7. Simpan seluruh perubahan
         await _uow.SaveChangesAsync(ct);
 
         return new ClaimApprovalHistoryDto

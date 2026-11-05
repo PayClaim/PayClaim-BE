@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Master;
 using PayClaim.Features.BenefitPlans.Commands;
 using PayClaim.Features.BenefitPlans.Queries;
@@ -12,7 +12,7 @@ public class BenefitPlansController(
     UpdateBenefitPlanHandler updateHandler, DeleteBenefitPlanHandler deleteHandler) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken ct)
+    public async Task<ActionResult<List<BenefitPlanDto>>> GetAll(CancellationToken ct)
     {
         var result = await getAllHandler.Handle(
             new GetBenefitPlansQuery(), ct);
@@ -21,7 +21,7 @@ public class BenefitPlansController(
     }
 
     [HttpGet("{departmentId}/{benefitId:guid}/{positionId}")]
-    public async Task<IActionResult> GetById( string departmentId, Guid benefitId, string positionId, CancellationToken ct)
+    public async Task<ActionResult<BenefitPlanDto>> GetById(string departmentId, Guid benefitId, string positionId, CancellationToken ct)
     {
         var result = await getByIdHandler.Handle(
             new GetBenefitPlanByIdQuery(
@@ -56,7 +56,7 @@ public class BenefitPlansController(
     }
 
     [HttpDelete("{departmentId}/{benefitId:guid}/{positionId}")]
-    public async Task<IActionResult> Delete( string departmentId, Guid benefitId, string positionId, CancellationToken ct)
+    public async Task<IActionResult> Delete(string departmentId, Guid benefitId, string positionId, CancellationToken ct)
     {
         await deleteHandler.Handle(
             new DeleteBenefitPlanCommand(

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Master;
 using PayClaim.Features.BenefitCategories.Commands.CreateBenefitCategory;
 using PayClaim.Features.BenefitCategories.Commands.UpdateBenefitCategory;
@@ -14,7 +14,7 @@ public class BenefitCategoriesController(CreateBenefitCategoryHandler createHand
     UpdateBenefitCategoryHandler updateHandler, DeleteBenefitCategoryHandler deleteHandler) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken ct)
+    public async Task<ActionResult<IReadOnlyCollection<BenefitCategoryDto>>> GetAll(CancellationToken ct)
     {
         var categories = await getAllHandler.Handle(
             new GetBenefitCategoriesQuery(), ct);
@@ -23,7 +23,7 @@ public class BenefitCategoriesController(CreateBenefitCategoryHandler createHand
     }
 
     [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById(
+    public async Task<ActionResult<BenefitCategoryDto>> GetById(
         int id,
         CancellationToken ct)
     {

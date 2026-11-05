@@ -24,7 +24,7 @@ public class AuthController(
 
     [HttpGet("me")]
     [Authorize]
-    public async Task<IActionResult> GetMe(CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<UserProfileResponseDto>>> GetMe(CancellationToken ct)
     {
         var accountIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) 
             ?? User.FindFirstValue("AccountId")

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Master;
 using PayClaim.Features.Departments.Commands.UpdataDepartment;
 using PayClaim.Features.Departments.Queries.GetDepartment;
@@ -6,6 +6,7 @@ using PayClaim.Features.Master.Departments.Commands.CreateDepartment;
 using PayClaim.Features.Master.Departments.Commands.DeleteDepartment;
 using PayClaim.Features.Master.Departments.Queries.GetDepartmentById;
 
+namespace PayClaim.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -15,7 +16,7 @@ public class DepartmentsController(
     DeleteDepartmentHandler deleteDepartmentHandler) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken ct)
+    public async Task<ActionResult<IReadOnlyCollection<DepartmentDto>>> GetAll(CancellationToken ct)
     {
         var departments = await getDepartmentsHandler.Handle(
             new GetDepartmentsQuery(), ct);
@@ -24,7 +25,7 @@ public class DepartmentsController(
     }
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(string id,CancellationToken ct)
+    public async Task<ActionResult<DepartmentDto>> GetById(string id, CancellationToken ct)
     {
         var department = await getDepartmentByIdHandler.Handle(
             new GetDepartmentByIdQuery(id), ct);
@@ -33,7 +34,7 @@ public class DepartmentsController(
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create( [FromBody] CreateDepartmentDto request, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] CreateDepartmentDto request, CancellationToken ct)
     {
         await createDepartmentHandler.Handle(
             new CreateDepartmentCommand(request), ct);
@@ -51,7 +52,7 @@ public class DepartmentsController(
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(string id,CancellationToken ct)
+    public async Task<IActionResult> Delete(string id, CancellationToken ct)
     {
         await deleteDepartmentHandler.Handle(
             new DeleteDepartmentCommand(id), ct);

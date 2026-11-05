@@ -75,14 +75,14 @@ public class TripProposalsController(
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] TripProposalFilterQuery filter, CancellationToken ct)
+    public async Task<ActionResult<PagedResponse<TripProposalListDto>>> GetAll([FromQuery] TripProposalFilterQuery filter, CancellationToken ct)
     {
         var result = await getListHandler.Handle(new GetTripProposalsQuery(filter), ct);
         return Ok(result);
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<TripProposalDetailDto>>> GetById([FromRoute] Guid id, CancellationToken ct)
     {
         var result = await getDetailHandler.Handle(new GetTripProposalByIdQuery(id), ct);
         return Ok(ApiResponse<TripProposalDetailDto>.Ok(result, "Trip proposal detail retrieved successfully."));

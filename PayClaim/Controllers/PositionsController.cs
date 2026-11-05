@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Master;
 using PayClaim.Features.Positions.Commands.CreatePosition;
 using PayClaim.Features.Positions.Commands.DeletePosition;
@@ -11,11 +11,11 @@ namespace PayClaim.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 public class PositionsController(
-    CreatePositionHandler createPositionHandler,GetPositionsHandler getPositionsHandler, GetPositionByIdQueryHandler getPositionByIdHandler,
+    CreatePositionHandler createPositionHandler, GetPositionsHandler getPositionsHandler, GetPositionByIdQueryHandler getPositionByIdHandler,
     UpdatePositionHandler updatePositionHandler, DeletePositionHandler deletePositionHandler) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken ct)
+    public async Task<ActionResult<IReadOnlyCollection<PositionDto>>> GetAll(CancellationToken ct)
     {
         var positions = await getPositionsHandler.Handle(
             new GetPositionsQuery(), ct);
@@ -24,7 +24,7 @@ public class PositionsController(
     }
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(string id, CancellationToken ct)
+    public async Task<ActionResult<PositionDto>> GetById(string id, CancellationToken ct)
     {
         var position = await getPositionByIdHandler.Handle(
             new GetPositionByIdQuery(id), ct);
@@ -51,7 +51,7 @@ public class PositionsController(
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete( string id, CancellationToken ct)
+    public async Task<IActionResult> Delete(string id, CancellationToken ct)
     {
         await deletePositionHandler.Handle(
             new DeletePositionCommand(id), ct);

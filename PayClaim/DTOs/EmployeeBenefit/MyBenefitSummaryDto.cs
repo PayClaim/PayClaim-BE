@@ -21,4 +21,6 @@ public class MyBenefitSummaryDto
     public DateOnly EndDate { get; set; }
 
     public bool IsActive { get; set; }
+    //coba
+    public string EmployeeName { get; set; } = string.Empty;
 }

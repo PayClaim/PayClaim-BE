@@ -8,6 +8,7 @@ public class UnitOfWork(
     IEmployeeRepository employees,
     IAccountRepository accounts,
     IBenefitPlanRepository benefitPlans,
+    IRoleRepository roles,
     IRepository<Department> departments,
     IRepository<Position> positions,
     IRepository<BenefitCategory> benefitCategories,
@@ -19,6 +20,7 @@ public class UnitOfWork(
     public IEmployeeRepository Employees { get; } = employees;
     public IAccountRepository Accounts { get; } = accounts;
     public IBenefitPlanRepository BenefitPlans { get; } = benefitPlans;
+    public IRoleRepository Roles { get; } = roles;
 
     public IRepository<Department> Departments { get; } = departments;
     public IRepository<Position> Positions { get; } = positions;
@@ -26,6 +28,8 @@ public class UnitOfWork(
     public IRepository<Benefit> Benefits { get; } = benefits;
     public IRepository<AccountRole> AccountRoles { get; } = accountRoles;
     public IRepository<EmployeeBenefit> EmployeeBenefits { get; } = employeeBenefits;
+    //public IRepository<Role> Roles { get; } = roles;
+
 
     public Task<int> SaveChangesAsync(CancellationToken ct = default)
         => context.SaveChangesAsync(ct);

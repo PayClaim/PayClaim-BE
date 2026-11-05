@@ -28,4 +28,12 @@ public class AccountRepository : Repository<Account>, IAccountRepository
     {
         return await _context.Accounts.AnyAsync(a => a.Username == username, ct);
     }
+
+    public async Task<Account?> GetByEmployeeIdWithRolesAsync(Guid employeeId, CancellationToken ct = default)
+    {
+        return await _context.Accounts
+            .Include(a => a.AccountRoles)
+                .ThenInclude(ar => ar.Role)
+            .FirstOrDefaultAsync(a => a.EmployeeId == employeeId, ct);
+    }
 }

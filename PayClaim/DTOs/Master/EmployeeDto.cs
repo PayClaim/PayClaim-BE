@@ -30,9 +30,9 @@ public class EmployeeDto
 
 public class CreateEmployeeDto
 {
-    [Required(ErrorMessage = "Employee number is required.")]
-    [StringLength(20, ErrorMessage = "Employee number cannot exceed 20 characters.")]
-    public string Number { get; set; } = string.Empty;
+    //[Required(ErrorMessage = "Employee number is required.")]
+    //[StringLength(20, ErrorMessage = "Employee number cannot exceed 20 characters.")]
+    //public string Number { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Full name is required.")]
     [StringLength(100, ErrorMessage = "Full name cannot exceed 100 characters.")]
@@ -57,18 +57,18 @@ public class CreateEmployeeDto
 
     public Guid? ManagerId { get; set; }
 
-    // Initial Account Information
-    [Required(ErrorMessage = "Username is required for the user account.")]
-    [StringLength(50, ErrorMessage = "Username cannot exceed 50 characters.")]
-    public string Username { get; set; } = string.Empty;
+    //// Initial Account Information
+    //[Required(ErrorMessage = "Username is required for the user account.")]
+    //[StringLength(50, ErrorMessage = "Username cannot exceed 50 characters.")]
+    //public string Username { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "Password is required for the user account.")]
-    [MinLength(6, ErrorMessage = "Password must be at least 6 characters.")]
-    public string Password { get; set; } = string.Empty;
+    //[Required(ErrorMessage = "Password is required for the user account.")]
+    //[MinLength(6, ErrorMessage = "Password must be at least 6 characters.")]
+    //public string Password { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "At least one role ID is required.")]
-    [MinLength(1, ErrorMessage = "At least one role ID is required.")]
-    public List<Guid> RoleIds { get; set; } = new();
+    //[Required(ErrorMessage = "At least one role ID is required.")]
+    //[MinLength(1, ErrorMessage = "At least one role ID is required.")]
+    //public List<Guid> RoleIds { get; set; } = new();
 }
 
 public class UpdateEmployeeDto

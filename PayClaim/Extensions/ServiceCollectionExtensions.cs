@@ -17,6 +17,8 @@ using PayClaim.Features.Benefits.Commands;
 using PayClaim.Features.Benefits.Queries;
 using PayClaim.Features.Departments.Commands.UpdataDepartment;
 using PayClaim.Features.Departments.Queries.GetDepartment;
+using PayClaim.Features.Employees.Commands.CreateEmployee;
+using PayClaim.Features.Employees.Commands.UpdateEmployee;
 using PayClaim.Features.Employees.Queries.GetEmployeeById;
 using PayClaim.Features.Employees.Queries.GetEmployees;
 using PayClaim.Features.Master.Departments.Commands.CreateDepartment;
@@ -47,6 +49,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<IBenefitPlanRepository, BenefitPlanRepository>();
+        services.AddScoped<IRoleRepository, RoleRepository>();
 
         // Unit of Work
         services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -96,6 +99,8 @@ public static class ServiceCollectionExtensions
         // Employee Handlers
         services.AddScoped<GetEmployeesHandler>();
         services.AddScoped<GetEmployeeByIdHandler>();
+        services.AddScoped<CreateEmployeeHandler>();
+        services.AddScoped<UpdateEmployeeHandler>();
 
         return services;
     }

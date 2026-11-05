@@ -18,6 +18,8 @@ public interface IUnitOfWork
     ITripProposalRepository TripProposals { get; }
     IRepository<TripApproval> TripApprovals { get; }
     IRepository<ProposalParticipant> ProposalParticipants { get; }
+    IRepository<Claim> Claims { get; }
+    IRepository<ClaimApproval> ClaimApprovals { get; }
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

@@ -16,7 +16,9 @@ public class UnitOfWork(
     IRepository<EmployeeBenefit> employeeBenefits,
     ITripProposalRepository tripProposals,
     IRepository<TripApproval> tripApprovals,
-    IRepository<ProposalParticipant> proposalParticipants
+    IRepository<ProposalParticipant> proposalParticipants,
+    IRepository<Claim> claims,
+    IRepository<ClaimApproval> claimApprovals
 ) : IUnitOfWork
 {
     public IEmployeeRepository Employees { get; } = employees;
@@ -32,6 +34,8 @@ public class UnitOfWork(
     public ITripProposalRepository TripProposals { get; } = tripProposals;
     public IRepository<TripApproval> TripApprovals { get; } = tripApprovals;
     public IRepository<ProposalParticipant> ProposalParticipants { get; } = proposalParticipants;
+    public IRepository<Claim> Claims { get; } = claims;
+    public IRepository<ClaimApproval> ClaimApprovals { get; } = claimApprovals;
 
     public Task<int> SaveChangesAsync(CancellationToken ct = default)
         => context.SaveChangesAsync(ct);

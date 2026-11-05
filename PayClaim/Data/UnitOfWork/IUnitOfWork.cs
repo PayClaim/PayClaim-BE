@@ -8,6 +8,7 @@ public interface IUnitOfWork
     IEmployeeRepository Employees { get; }
     IAccountRepository Accounts { get; }
     IBenefitPlanRepository BenefitPlans { get; }
+    IRoleRepository Roles { get; }
 
     IRepository<Department> Departments { get; }
     IRepository<Position> Positions { get; }
@@ -15,6 +16,7 @@ public interface IUnitOfWork
     IRepository<Benefit> Benefits { get; }
     IRepository<AccountRole> AccountRoles { get; }
     IRepository<EmployeeBenefit> EmployeeBenefits { get; }
+    //IRepository<Role> Roles { get; }
     ITripProposalRepository TripProposals { get; }
     IRepository<TripApproval> TripApprovals { get; }
     IRepository<ProposalParticipant> ProposalParticipants { get; }

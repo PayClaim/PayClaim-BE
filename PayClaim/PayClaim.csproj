@@ -31,10 +31,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="DTOs\" />
     <Folder Include="Common\" />
-    <Folder Include="Features\Employees\Commands\UpdateEmployee\" />
-    <Folder Include="Features\Employees\Commands\DeleteEmployee\" />
   </ItemGroup>
 
 </Project>

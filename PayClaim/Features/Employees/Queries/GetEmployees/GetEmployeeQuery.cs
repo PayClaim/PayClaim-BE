@@ -19,6 +19,7 @@ public class GetEmployeesHandler(PayClaimDbContext db)
                 Number = e.Number,
                 FullName = e.FullName,
                 Email = e.Email,
+                HireDate = e.HireDate,
                 IsActive = e.IsActive,
 
                 PositionId = e.PositionId,
@@ -29,9 +30,9 @@ public class GetEmployeesHandler(PayClaimDbContext db)
 
                 ManagerId = e.ManagerId,
                 ManagerName = e.Manager != null
-                    ? e.Manager.FullName
-                    : null
-            })
+                ? e.Manager.FullName
+            : null
+                })
             .ToListAsync(ct);
     }
 }

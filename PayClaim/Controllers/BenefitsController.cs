@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Master;
 using PayClaim.Features.Benefits.Commands;
 using PayClaim.Features.Benefits.Queries;
@@ -7,11 +7,17 @@ namespace PayClaim.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class BenefitsController(CreateBenefitHandler createHandler, GetBenefitsHandler getAllHandler, GetBenefitByIdHandler getByIdHandler,
-    UpdateBenefitHandler updateHandler, DeleteBenefitHandler deleteHandler) : ControllerBase
+[Produces("application/json")]
+public class BenefitsController(
+    CreateBenefitHandler createHandler,
+    GetBenefitsHandler getAllHandler,
+    GetBenefitByIdHandler getByIdHandler,
+    UpdateBenefitHandler updateHandler,
+    DeleteBenefitHandler deleteHandler) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken ct)
+    [ProducesResponseType(typeof(List<BenefitDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<BenefitDto>>> GetAll(CancellationToken ct)
     {
         var result = await getAllHandler.Handle(
             new GetBenefitsQuery(), ct);
@@ -20,7 +26,9 @@ public class BenefitsController(CreateBenefitHandler createHandler, GetBenefitsH
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
+    [ProducesResponseType(typeof(BenefitDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<BenefitDto>> GetById(Guid id, CancellationToken ct)
     {
         var result = await getByIdHandler.Handle(
             new GetBenefitByIdQuery(id), ct);
@@ -29,29 +37,37 @@ public class BenefitsController(CreateBenefitHandler createHandler, GetBenefitsH
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateBenefitDto request, CancellationToken ct)
+    [ProducesResponseType(typeof(BenefitIdResponseDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<BenefitIdResponseDto>> Create([FromBody] CreateBenefitDto request, CancellationToken ct)
     {
         var id = await createHandler.Handle(
             new CreateBenefitCommand(request), ct);
 
-        return Created($"/api/benefits/{id}", new { id });
+        return CreatedAtAction(nameof(GetById), new { id }, new BenefitIdResponseDto(id));
     }
 
     [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateBenefitDto request, CancellationToken ct)
+    [ProducesResponseType(typeof(BenefitMessageResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<BenefitMessageResponseDto>> Update(Guid id, [FromBody] UpdateBenefitDto request, CancellationToken ct)
     {
         await updateHandler.Handle(
             new UpdateBenefitCommand(id, request), ct);
 
-        return Ok(new { message = "Benefit updated successfully." });
+        return Ok(new BenefitMessageResponseDto("Benefit updated successfully."));
     }
 
     [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    [ProducesResponseType(typeof(BenefitMessageResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<BenefitMessageResponseDto>> Delete(Guid id, CancellationToken ct)
     {
         await deleteHandler.Handle(
             new DeleteBenefitCommand(id), ct);
 
-        return Ok(new { message = "Benefit deleted successfully." });
+        return Ok(new BenefitMessageResponseDto("Benefit deleted successfully."));
     }
 }

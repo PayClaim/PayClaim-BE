@@ -7,6 +7,8 @@ using PayClaim.Data.Repositories.Interfaces;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.Features.Auth.Commands.Login;
 using PayClaim.Features.Auth.Queries.GetMe;
+using PayClaim.Features.Auth.Commands.ChangePassword;
+using PayClaim.Features.Auth.Commands.ResetPassword;
 using PayClaim.Features.BenefitCategories.Commands.CreateBenefitCategory;
 using PayClaim.Features.BenefitCategories.Commands.DeleteBenefitCategory;
 using PayClaim.Features.BenefitCategories.Commands.UpdateBenefitCategory;
@@ -78,6 +80,8 @@ public static class ServiceCollectionExtensions
         // Auth Handlers
         services.AddScoped<LoginHandler>();
         services.AddScoped<GetMeHandler>();
+        services.AddScoped<ChangePasswordHandler>();
+        services.AddScoped<ResetPasswordHandler>();
 
         // Trip Proposal Handlers
         services.AddScoped<CreateTripProposalHandler>();

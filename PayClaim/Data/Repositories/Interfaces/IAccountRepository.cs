@@ -7,4 +7,5 @@ public interface IAccountRepository : IRepository<Account>
     Task<Account?> GetByUsernameWithDetailsAsync(string username, CancellationToken ct = default);
     Task<bool> ExistsByUsernameAsync(string username, CancellationToken ct = default);
     Task<Account?> GetByEmployeeIdWithRolesAsync(Guid employeeId, CancellationToken ct = default);
+    Task<Account?> GetByIdentifierAsync(string identifier, CancellationToken ct = default);
 }

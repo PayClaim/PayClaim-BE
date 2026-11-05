@@ -36,4 +36,14 @@ public class AccountRepository : Repository<Account>, IAccountRepository
                 .ThenInclude(ar => ar.Role)
             .FirstOrDefaultAsync(a => a.EmployeeId == employeeId, ct);
     }
+
+    public async Task<Account?> GetByIdentifierAsync(string identifier, CancellationToken ct = default)
+    {
+        var trimmed = identifier.Trim();
+        return await _context.Accounts
+            .Include(a => a.Employee)
+            .Include(a => a.AccountRoles)
+                .ThenInclude(ar => ar.Role)
+            .FirstOrDefaultAsync(a => a.Username == trimmed || (a.Employee != null && a.Employee.Email == trimmed), ct);
+    }
 }

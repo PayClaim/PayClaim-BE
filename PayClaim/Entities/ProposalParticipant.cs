@@ -6,7 +6,7 @@ public class ProposalParticipant
 
     public Guid TripProposalId { get; set; }
 
-    public Guid? EmployeeId { get; set; }
+    public Guid EmployeeId { get; set; }
 
     public bool IsPic { get; set; }
 

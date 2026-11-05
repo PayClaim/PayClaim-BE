@@ -140,11 +140,10 @@ public class TripProposalsController(
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> Complete(
         [FromRoute] Guid id,
-        [FromForm] IFormFile? reportFile,
-        [FromForm] string? reportNotes,
+        [FromForm] CompleteTripProposalDto request,
         CancellationToken ct)
     {
-        var result = await completeHandler.Handle(new CompleteTripProposalCommand(id, reportFile, reportNotes), ct);
+        var result = await completeHandler.Handle(new CompleteTripProposalCommand(id, request.ReportFile, request.ReportNotes), ct);
         return Ok(ApiResponse<TripProposalDetailDto>.Ok(result, "Travel report submitted and trip marked as Completed successfully."));
     }
 }

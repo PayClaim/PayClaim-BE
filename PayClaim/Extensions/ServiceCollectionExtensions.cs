@@ -13,6 +13,8 @@ using PayClaim.Features.BenefitCategories.Commands.UpdateBenefitCategory;
 using PayClaim.Features.BenefitCategories.Queries.GetBenefitCategories;
 using PayClaim.Features.BenefitCategories.Queries.GetBenefitCategoryById;
 using PayClaim.Features.Claims.Commands.CreateClaim;
+using PayClaim.Features.Claims.Queries.GetClaimById;
+using PayClaim.Features.Claims.Queries.GetClaims;
 using PayClaim.Features.BenefitPlans.Commands;
 using PayClaim.Features.BenefitPlans.Queries;
 using PayClaim.Features.Benefits.Commands;
@@ -113,6 +115,8 @@ public static class ServiceCollectionExtensions
 
         // Claim Handlers
         services.AddScoped<CreateClaimHandler>();
+        services.AddScoped<GetClaimsHandler>();
+        services.AddScoped<GetClaimByIdHandler>();
 
         return services;
     }

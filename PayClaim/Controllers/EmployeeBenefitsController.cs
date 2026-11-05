@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.EmployeeBenefit;
+using PayClaim.DTOs.Master;
 using PayClaim.Features.EmployeeBenefits.Commands;
 using PayClaim.Features.EmployeeBenefits.Queries;
 using PayClaim.Features.EmployeeBenefits.Queries.GetMyBenefits;
@@ -15,7 +16,7 @@ public class EmployeeBenefitsController(
     AdjustEmployeeBenefitHandler adjustHandler) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetAll(
+    public async Task<ActionResult<IReadOnlyCollection<MyBenefitSummaryDto>>> GetAll(
         [FromQuery] EmployeeBenefitFilterQuery filter,
         CancellationToken ct)
     {
@@ -26,7 +27,7 @@ public class EmployeeBenefitsController(
     }
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetMyBenefits(Guid id, CancellationToken ct)
+    public async Task<ActionResult<MyBenefitSummaryDto>> GetMyBenefits(Guid id, CancellationToken ct)
     {
         var result = await getMyHandler.Handle(
             new GetMyBenefitsQuery(id), ct);

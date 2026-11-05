@@ -3,7 +3,9 @@ using PayClaim.DTOs.Common;
 using PayClaim.DTOs.TripProposal;
 using PayClaim.Enums;
 using PayClaim.Features.TripProposals.Commands.ApproveTripProposal;
+using PayClaim.Features.TripProposals.Commands.CompleteTripProposal;
 using PayClaim.Features.TripProposals.Commands.CreateTripProposal;
+using PayClaim.Features.TripProposals.Commands.UpdateTripProposal;
 using PayClaim.Features.TripProposals.Queries.GetTripProposalById;
 using PayClaim.Features.TripProposals.Queries.GetTripProposals;
 
@@ -15,14 +17,14 @@ public class TripProposalsController(
     CreateTripProposalHandler createHandler,
     GetTripProposalsHandler getListHandler,
     GetTripProposalByIdHandler getDetailHandler,
-    ApproveTripProposalHandler approveHandler) : ControllerBase
+    ApproveTripProposalHandler approveHandler,
+    UpdateTripProposalHandler updateHandler,
+    CompleteTripProposalHandler completeHandler) : ControllerBase
 {
-    [HttpPost]
-    public async Task<IActionResult> Create([FromForm] CreateTripProposalDto request, CancellationToken ct)
+    private void FallbackParseParticipants(CreateTripProposalDto request)
     {
         if ((request.Participants == null || request.Participants.Count == 0) && Request.HasFormContentType)
         {
-            // 1. Fallback jika Participants dikirim sebagai string JSON di dalam FormData (umum di React / client API)
             if (Request.Form.TryGetValue("Participants", out var jsonVal) || Request.Form.TryGetValue("participants", out jsonVal))
             {
                 var str = jsonVal.ToString().Trim();
@@ -42,7 +44,6 @@ public class TripProposalsController(
                 }
             }
 
-            // 2. Fallback jika Swagger UI mengirimkan field peserta secara flat (employeeId, isPic, amount)
             if (request.Participants == null || request.Participants.Count == 0)
             {
                 var empIds = Request.Form["employeeId"].Count > 0 ? Request.Form["employeeId"] : Request.Form["EmployeeId"];
@@ -69,7 +70,12 @@ public class TripProposalsController(
                 }
             }
         }
+    }
 
+    [HttpPost]
+    public async Task<IActionResult> Create([FromForm] CreateTripProposalDto request, CancellationToken ct)
+    {
+        FallbackParseParticipants(request);
         var result = await createHandler.Handle(new CreateTripProposalCommand(request), ct);
         return StatusCode(StatusCodes.Status201Created, ApiResponse<TripProposalDetailDto>.Created(result, "Trip proposal submitted successfully."));
     }
@@ -88,19 +94,57 @@ public class TripProposalsController(
         return Ok(ApiResponse<TripProposalDetailDto>.Ok(result, "Trip proposal detail retrieved successfully."));
     }
 
+    /// <summary>
+    /// Persetujuan bertingkat SPD:
+    /// - Jika status Submitted (1) ➡️ Disetujui Manager, diteruskan ke Finance dengan status UnderReview (2).
+    /// - Jika status UnderReview (2) ➡️ Disetujui Finance sekaligus menetapkan budget aktual, status jadi Approved (4).
+    /// </summary>
     [HttpPost("{id:guid}/approve")]
     public async Task<IActionResult> Approve([FromRoute] Guid id, [FromBody] TripApprovalActionDto request, CancellationToken ct)
     {
         request.Decision = ApprovalDecision.Approved;
         var result = await approveHandler.Handle(new ApproveTripProposalCommand(id, request), ct);
-        return Ok(ApiResponse<TripApprovalHistoryDto>.Ok(result, "Trip proposal approved successfully."));
+        return Ok(ApiResponse<TripApprovalHistoryDto>.Ok(result, "Trip proposal approval step processed successfully."));
     }
 
+    /// <summary>
+    /// Menolak atau meminta revisi SPD (Manager atau Finance).
+    /// </summary>
     [HttpPost("{id:guid}/reject")]
     public async Task<IActionResult> Reject([FromRoute] Guid id, [FromBody] TripApprovalActionDto request, CancellationToken ct)
     {
-        request.Decision = ApprovalDecision.Rejected;
+        if (request.Decision != ApprovalDecision.NeedsRevision)
+        {
+            request.Decision = ApprovalDecision.Rejected;
+        }
+
         var result = await approveHandler.Handle(new ApproveTripProposalCommand(id, request), ct);
-        return Ok(ApiResponse<TripApprovalHistoryDto>.Ok(result, "Trip proposal rejected successfully."));
+        return Ok(ApiResponse<TripApprovalHistoryDto>.Ok(result, "Trip proposal decision recorded successfully."));
+    }
+
+    /// <summary>
+    /// Mengedit & mengajukan ulang (Resubmit) SPD yang berstatus NeedsRevision atau Submitted.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update([FromRoute] Guid id, [FromForm] CreateTripProposalDto request, CancellationToken ct)
+    {
+        FallbackParseParticipants(request);
+        var result = await updateHandler.Handle(new UpdateTripProposalCommand(id, request), ct);
+        return Ok(ApiResponse<TripProposalDetailDto>.Ok(result, "Trip proposal resubmitted successfully."));
+    }
+
+    /// <summary>
+    /// Pengumpulan Laporan Pasca-Perjalanan Dinas (Submit Travel Report) ➡️ Status berubah ke Completed (6).
+    /// </summary>
+    [HttpPost("{id:guid}/complete")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> Complete(
+        [FromRoute] Guid id,
+        [FromForm] IFormFile? reportFile,
+        [FromForm] string? reportNotes,
+        CancellationToken ct)
+    {
+        var result = await completeHandler.Handle(new CompleteTripProposalCommand(id, reportFile, reportNotes), ct);
+        return Ok(ApiResponse<TripProposalDetailDto>.Ok(result, "Travel report submitted and trip marked as Completed successfully."));
     }
 }

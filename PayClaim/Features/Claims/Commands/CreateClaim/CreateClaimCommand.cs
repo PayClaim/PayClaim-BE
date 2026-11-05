@@ -106,7 +106,7 @@ public class CreateClaimHandler
                     throw new NotFoundException($"Business trip proposal with ID '{request.TripProposalId.Value}' was not found.");
                 }
 
-                if (trip.Status != TripProposalStatus.Approved)
+                if (trip.Status != TripProposalStatus.Approved && trip.Status != TripProposalStatus.Completed)
                 {
                     throw new BusinessRuleException($"Cannot submit reimbursement for a trip proposal that is in '{trip.Status}' status. The trip proposal must be 'Approved' first.");
                 }

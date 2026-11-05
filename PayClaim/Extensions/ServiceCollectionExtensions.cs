@@ -40,7 +40,9 @@ using PayClaim.Features.Positions.Commands.UpdatePosition;
 using PayClaim.Features.Positions.Queries.GetPositionById;
 using PayClaim.Features.Positions.Queries.GetPositions;
 using PayClaim.Features.TripProposals.Commands.ApproveTripProposal;
+using PayClaim.Features.TripProposals.Commands.CompleteTripProposal;
 using PayClaim.Features.TripProposals.Commands.CreateTripProposal;
+using PayClaim.Features.TripProposals.Commands.UpdateTripProposal;
 using PayClaim.Features.TripProposals.Queries.GetTripProposalById;
 using PayClaim.Features.TripProposals.Queries.GetTripProposals;
 
@@ -82,6 +84,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<GetTripProposalsHandler>();
         services.AddScoped<GetTripProposalByIdHandler>();
         services.AddScoped<ApproveTripProposalHandler>();
+        services.AddScoped<UpdateTripProposalHandler>();
+        services.AddScoped<CompleteTripProposalHandler>();
 
         //handler
         services.AddScoped<CreateDepartmentHandler>();

@@ -10,3 +10,6 @@
 # Local settings and secrets
 appsettings.Development.json
 *.md
+
+# Uploaded assets
+**/wwwroot/uploads/**

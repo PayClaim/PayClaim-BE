@@ -44,10 +44,16 @@ public class GetTripProposalsHandler
             dbQuery = dbQuery.Where(tp => tp.StartDate <= filter.StartDateTo.Value);
         }
 
-        // 4. Hitung Total Data Sesuai Filter
+        // 4. Filter Karyawan Peserta / PIC
+        if (filter.EmployeeId.HasValue)
+        {
+            dbQuery = dbQuery.Where(tp => tp.Participants.Any(p => p.EmployeeId == filter.EmployeeId.Value));
+        }
+
+        // 5. Hitung Total Data Sesuai Filter
         var totalCount = await dbQuery.CountAsync(ct);
 
-        // 5. Paging & Proyeksi Langsung ke DTO
+        // 6. Paging & Proyeksi Langsung ke DTO
         var items = await dbQuery
             .OrderByDescending(tp => tp.SubmittedAt)
             .Skip((filter.PageNumber - 1) * filter.PageSize)

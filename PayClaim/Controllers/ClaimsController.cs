@@ -6,6 +6,7 @@ using PayClaim.Features.Claims.Commands.ApproveClaim;
 using PayClaim.Features.Claims.Commands.CreateClaim;
 using PayClaim.Features.Claims.Commands.PayClaim;
 using PayClaim.Features.Claims.Commands.RejectClaim;
+using PayClaim.Features.Claims.Commands.UpdateClaim;
 using PayClaim.Features.Claims.Queries.GetClaimById;
 using PayClaim.Features.Claims.Queries.GetClaims;
 
@@ -19,7 +20,8 @@ public class ClaimsController(
     GetClaimByIdHandler getDetailHandler,
     ApproveClaimHandler approveHandler,
     RejectClaimHandler rejectHandler,
-    PayClaimHandler payHandler) : ControllerBase
+    PayClaimHandler payHandler,
+    UpdateClaimHandler updateHandler) : ControllerBase
 {
     /// <summary>
     /// Mengajukan klaim / reimbursement baru (mendukung lampiran bukti nota/kuitansi via multipart/form-data).
@@ -106,5 +108,20 @@ public class ClaimsController(
     {
         var result = await payHandler.Handle(new PayClaimCommand(id, request?.Notes, request?.ApproverId), ct);
         return Ok(ApiResponse<ClaimApprovalHistoryDto>.Ok(result, "Claim marked as Paid and added to payroll successfully."));
+    }
+
+    /// <summary>
+    /// Mengedit & mengajukan ulang (Resubmit) klaim yang berstatus NeedsRevision atau Submitted.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> Update([FromRoute] Guid id, [FromForm] CreateClaimDto request, CancellationToken ct)
+    {
+        var claimVal = User.FindFirst("employeeId")?.Value 
+            ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        Guid? submitterId = Guid.TryParse(claimVal, out var parsedId) ? parsedId : null;
+
+        var result = await updateHandler.Handle(new UpdateClaimCommand(id, request, submitterId), ct);
+        return Ok(ApiResponse<ClaimDetailDto>.Ok(result, "Claim resubmitted successfully."));
     }
 }

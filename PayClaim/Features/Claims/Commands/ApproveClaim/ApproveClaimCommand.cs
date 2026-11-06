@@ -9,7 +9,11 @@ using PayClaim.Enums;
 
 namespace PayClaim.Features.Claims.Commands.ApproveClaim;
 
-public record ApproveClaimCommand(Guid ClaimId, ClaimApprovalActionDto Request, Guid? LoggedInApproverId = null);
+public record ApproveClaimCommand(
+    Guid ClaimId,
+    ClaimApprovalActionDto Request,
+    Guid LoggedInApproverId,
+    IReadOnlyCollection<string> ApproverRoles);
 
 public class ApproveClaimHandler
 {
@@ -24,96 +28,132 @@ public class ApproveClaimHandler
         _emailService = emailService;
     }
 
-    public async Task<ClaimApprovalHistoryDto> Handle(ApproveClaimCommand command, CancellationToken ct = default)
+    public async Task<ClaimApprovalHistoryDto> Handle(
+    ApproveClaimCommand command,
+    CancellationToken ct = default)
     {
-        // 1. Ambil data klaim
-        var claim = await _uow.Claims.GetByIdAsync(new object[] { command.ClaimId }, ct);
+        // 1. Ambil Claim
+        var claim = await _uow.Claims.GetByIdAsync(
+            new object[] { command.ClaimId },
+            ct);
+
         if (claim == null)
         {
-            throw new NotFoundException($"Claim with ID '{command.ClaimId}' was not found.");
+            throw new NotFoundException(
+                $"Claim with ID '{command.ClaimId}' was not found.");
         }
 
-        // 2. Validasi status klaim yang berhak di-approve
-        if (claim.Status != ClaimStatus.Submitted && claim.Status != ClaimStatus.UnderReview)
-        {
-            throw new BusinessRuleException(
-                $"Cannot approve claim with status '{claim.Status}'. Only claims in 'Submitted' (Manager Review) or 'UnderReview' (Finance Review) can be approved.");
-        }
-
+        // 2. Tentukan tahap approval berdasarkan status Claim
         byte currentLevel;
         ClaimStatus nextStatus;
-        string approverRoleKeyword;
+        string requiredRole;
 
-        // 3. Tentukan Tingkat Approval (Level 1 Manager vs Level 2 Finance)
         if (claim.Status == ClaimStatus.Submitted)
         {
-            // Level 1: Persetujuan Manager
             currentLevel = 1;
-            nextStatus = ClaimStatus.UnderReview; // Menunggu verifikasi Finance
-            approverRoleKeyword = "Manager";
+            nextStatus = ClaimStatus.UnderReview;
+            requiredRole = "Manager";
         }
-        else // claim.Status == ClaimStatus.UnderReview
+        else if (claim.Status == ClaimStatus.UnderReview)
         {
-            // Level 2: Verifikasi & Persetujuan Dokumen oleh Finance
             currentLevel = 2;
-            nextStatus = ClaimStatus.Approved; // Disetujui final
-            approverRoleKeyword = "Finance";
-
-            // LOGIKA FINANSIAL: Potong Saldo Benefit saat Finance menyetujui klaim
-            if (claim.ClaimType == ClaimType.Benefit)
-            {
-                if (!claim.EmployeeBenefitId.HasValue)
-                {
-                    throw new BusinessRuleException("Benefit claim does not have an associated EmployeeBenefit quota.");
-                }
-
-                var empBenefit = await _context.EmployeeBenefits
-                    .FirstOrDefaultAsync(eb => eb.Id == claim.EmployeeBenefitId.Value, ct);
-
-                if (empBenefit == null)
-                {
-                    throw new NotFoundException($"Employee benefit quota with ID '{claim.EmployeeBenefitId.Value}' was not found.");
-                }
-
-                if (empBenefit.Balance < claim.Amount)
-                {
-                    throw new BusinessRuleException(
-                        $"Cannot approve claim: Insufficient benefit quota balance. Available balance is Rp {empBenefit.Balance:N0}, but claim amount requested is Rp {claim.Amount:N0}.");
-                }
-
-                empBenefit.Balance -= claim.Amount;
-                _uow.EmployeeBenefits.Update(empBenefit);
-            }
+            nextStatus = ClaimStatus.Approved;
+            requiredRole = "Finance";
         }
-
-        // 4. Resolusi Approver
-        var approverId = command.Request.ApproverId ?? command.LoggedInApproverId;
-        Employee? approver = null;
-
-        if (approverId.HasValue)
+        else
         {
-            approver = await _uow.Employees.GetByIdAsync(new object[] { approverId.Value }, ct);
+            throw new BusinessRuleException(
+                $"Cannot approve claim with status '{claim.Status}'. Only Submitted or UnderReview claims can be approved.");
         }
+
+        // 3. Periksa apakah approver memiliki role yang sesuai
+        var hasRequiredRole = command.ApproverRoles
+            .Contains(requiredRole, StringComparer.OrdinalIgnoreCase);
+
+        if (!hasRequiredRole)
+        {
+            throw new ForbiddenException(
+                $"Only {requiredRole} can approve this claim at the current stage.");
+        }
+
+        // 4. Ambil Employee yang sedang melakukan approval
+        var approver = await _context.Employees
+            .FirstOrDefaultAsync(
+                e => e.Id == command.LoggedInApproverId,
+                ct);
 
         if (approver == null)
         {
-            // Fallback untuk kemudahan development: cari employee sesuai keyword role (Manager atau Finance)
-            approver = await _context.Employees
-                .Include(e => e.Position)
-                .FirstOrDefaultAsync(e => e.Position.Title.Contains(approverRoleKeyword) || e.Position.Title.Contains("Lead") || e.Position.Title.Contains("Director"), ct)
-                ?? await _context.Employees.FirstOrDefaultAsync(ct);
+            throw new NotFoundException(
+                "Approver employee was not found.");
+        }
 
-            if (approver == null)
+        if (claim.EmployeeId == approver.Id)
+        {
+            throw new ForbiddenException(
+                "You cannot approve your own claim.");
+        }
+
+        if (!approver.IsActive)
+        {
+            throw new ForbiddenException(
+                "Inactive employees cannot approve claims.");
+        }
+
+        // 5. Jika Manager, pastikan dia Manager dari pengaju Claim
+        if (requiredRole == "Manager")
+        {
+            var isManagerOfSubmitter = await _context.Employees
+                .AnyAsync(
+                    e => e.Id == claim.EmployeeId &&
+                         e.ManagerId == approver.Id,
+                    ct);
+
+            if (!isManagerOfSubmitter)
             {
-                throw new NotFoundException($"No eligible approver ({approverRoleKeyword}) found in the system.");
+                throw new ForbiddenException(
+                    "You are not the manager of the employee who submitted this claim.");
             }
         }
 
-        // 5. Update Status Klaim
+        // 6. Jika Finance menyetujui Benefit Claim, potong saldo Benefit
+        if (requiredRole == "Finance" &&
+            claim.ClaimType == ClaimType.Benefit)
+        {
+            if (!claim.EmployeeBenefitId.HasValue)
+            {
+                throw new BusinessRuleException(
+                    "Benefit claim does not have an associated EmployeeBenefit quota.");
+            }
+
+            var empBenefit = await _context.EmployeeBenefits
+                .FirstOrDefaultAsync(
+                    eb => eb.Id == claim.EmployeeBenefitId.Value,
+                    ct);
+
+            if (empBenefit == null)
+            {
+                throw new NotFoundException(
+                    $"Employee benefit quota with ID '{claim.EmployeeBenefitId.Value}' was not found.");
+            }
+
+            if (empBenefit.Balance < claim.Amount)
+            {
+                throw new BusinessRuleException(
+                    $"Cannot approve claim: Insufficient benefit quota balance. Available balance is Rp {empBenefit.Balance:N0}, but claim amount requested is Rp {claim.Amount:N0}.");
+            }
+
+            empBenefit.Balance -= claim.Amount;
+
+            _uow.EmployeeBenefits.Update(empBenefit);
+        }
+
+        // 7. Update status Claim
         claim.Status = nextStatus;
+
         _uow.Claims.Update(claim);
 
-        // 6. Buat Riwayat Jejak Approval (Audit Trail)
+        // 8. Simpan riwayat approval
         var approvalRecord = new ClaimApproval
         {
             ClaimId = claim.Id,
@@ -125,9 +165,11 @@ public class ApproveClaimHandler
             DecidedAt = DateTime.UtcNow
         };
 
-        await _uow.ClaimApprovals.AddAsync(approvalRecord, ct);
+        await _uow.ClaimApprovals.AddAsync(
+            approvalRecord,
+            ct);
 
-        // 7. Simpan seluruh transaksi ke database
+        // 9. Simpan seluruh perubahan
         await _uow.SaveChangesAsync(ct);
 
         // 8. Kirim notifikasi email ke karyawan

@@ -1,59 +1,134 @@
 using Microsoft.EntityFrameworkCore;
+using PayClaim.Common.Exceptions;
 using PayClaim.Data;
 using PayClaim.DTOs.Claim;
 using PayClaim.DTOs.Common;
+using PayClaim.Enums;
 
 namespace PayClaim.Features.Claims.Queries.GetClaims;
 
-public record GetClaimsQuery(ClaimFilterQuery Filter);
+public record GetClaimsQuery(
+    ClaimFilterQuery Filter,
+    Guid? RequesterEmployeeId,
+    IReadOnlyCollection<string> RequesterRoles,
+    bool IsMyClaims = false);
 
-public class GetClaimsHandler
+public class GetClaimsHandler(PayClaimDbContext context)
 {
-    private readonly PayClaimDbContext _context;
 
-    public GetClaimsHandler(PayClaimDbContext context)
-    {
-        _context = context;
-    }
-
-    public async Task<PagedResponse<ClaimListDto>> Handle(GetClaimsQuery query, CancellationToken ct = default)
+    public async Task<PagedResponse<ClaimListDto>> Handle(
+        GetClaimsQuery query,
+        CancellationToken ct = default)
     {
         var filter = query.Filter;
-        var dbQuery = _context.Claims.AsNoTracking().AsQueryable();
+        var roles = query.RequesterRoles ?? Array.Empty<string>();
 
-        // 1. Filter Berdasarkan Jenis Klaim
+        var dbQuery = context.Claims
+            .AsNoTracking()
+            .AsQueryable();
+
+        bool isAdmin = roles.Contains(
+            "Admin", StringComparer.OrdinalIgnoreCase);
+
+        bool isManager = roles.Contains(
+            "Manager", StringComparer.OrdinalIgnoreCase);
+
+        bool isFinance = roles.Contains(
+            "Finance", StringComparer.OrdinalIgnoreCase);
+
+        // 1. Tentukan data yang boleh diakses.
+        if (query.IsMyClaims)
+        {
+            if (!query.RequesterEmployeeId.HasValue ||
+                query.RequesterEmployeeId.Value == Guid.Empty)
+            {
+                throw new ForbiddenException(
+                    "Employee identity is required to access your claims.");
+            }
+
+            // Employee hanya melihat Claim miliknya sendiri.
+            // EmployeeId selalu berasal dari JWT.
+            dbQuery = dbQuery.Where(c =>
+                c.EmployeeId == query.RequesterEmployeeId.Value);
+        }
+        else if (!isAdmin)
+        {
+            if (!query.RequesterEmployeeId.HasValue ||
+                query.RequesterEmployeeId.Value == Guid.Empty)
+            {
+                throw new ForbiddenException(
+                    "Employee identity is required.");
+            }
+
+            if (!isManager && !isFinance)
+            {
+                throw new ForbiddenException(
+                    "You are not allowed to access all claims.");
+            }
+
+            var requesterEmployeeId =
+                query.RequesterEmployeeId.Value;
+
+            // Manager hanya melihat Claim Submitted dari bawahan langsung.
+            // Finance melihat Claim yang menunggu approval atau payment.
+            dbQuery = dbQuery.Where(c =>
+                (
+                    isManager &&
+                    c.Status == ClaimStatus.Submitted &&
+                    c.Employee.ManagerId == requesterEmployeeId
+                )
+                ||
+                (
+                    isFinance &&
+                    (
+                        c.Status == ClaimStatus.UnderReview ||
+                        c.Status == ClaimStatus.Approved
+                    )
+                )
+            );
+        }
+
+        // Jika Admin, tidak ada pembatasan akses berdasarkan status.
+        // Admin tetap bisa menggunakan filter di bawah.
+
+        // 2. Filter berdasarkan jenis Claim.
         if (filter.ClaimType.HasValue)
         {
-            dbQuery = dbQuery.Where(c => c.ClaimType == filter.ClaimType.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.ClaimType == filter.ClaimType.Value);
         }
 
-        // 2. Filter Berdasarkan Status Klaim
+        // 3. Filter berdasarkan status Claim.
         if (filter.Status.HasValue)
         {
-            dbQuery = dbQuery.Where(c => c.Status == filter.Status.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.Status == filter.Status.Value);
         }
 
-        // 3. Filter Berdasarkan Karyawan Pengaju
+        // 4. Filter berdasarkan EmployeeId.
         if (filter.EmployeeId.HasValue)
         {
-            dbQuery = dbQuery.Where(c => c.EmployeeId == filter.EmployeeId.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.EmployeeId == filter.EmployeeId.Value);
         }
 
-        // 4. Filter Rentang Tanggal Transaksi
+        // 5. Filter tanggal transaksi.
         if (filter.StartDate.HasValue)
         {
-            dbQuery = dbQuery.Where(c => c.TransactionDate >= filter.StartDate.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.TransactionDate >= filter.StartDate.Value);
         }
 
         if (filter.EndDate.HasValue)
         {
-            dbQuery = dbQuery.Where(c => c.TransactionDate <= filter.EndDate.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.TransactionDate <= filter.EndDate.Value);
         }
 
-        // 5. Hitung Total Data Sesuai Filter
+        // 6. Hitung total data.
         var totalCount = await dbQuery.CountAsync(ct);
 
-        // 6. Pagination & Proyeksi Langsung ke DTO
+        // 7. Pagination dan projection.
         var items = await dbQuery
             .OrderByDescending(c => c.SubmittedAt)
             .Skip((filter.PageNumber - 1) * filter.PageSize)
@@ -69,12 +144,23 @@ public class GetClaimsHandler
                 Status = c.Status,
                 EmployeeId = c.EmployeeId,
                 EmployeeName = c.Employee.FullName,
-                BenefitName = c.EmployeeBenefit != null ? c.EmployeeBenefit.Benefit.Name : null,
-                TripProposalDescription = c.TripProposal != null ? c.TripProposal.Description : null,
+
+                BenefitName = c.EmployeeBenefit != null
+                    ? c.EmployeeBenefit.Benefit.Name
+                    : null,
+
+                TripProposalDescription = c.TripProposal != null
+                    ? c.TripProposal.Description
+                    : null,
+
                 FilePath = c.FilePath
             })
             .ToListAsync(ct);
 
-        return new PagedResponse<ClaimListDto>(items, filter.PageNumber, filter.PageSize, totalCount);
+        return new PagedResponse<ClaimListDto>(
+            items,
+            filter.PageNumber,
+            filter.PageSize,
+            totalCount);
     }
 }

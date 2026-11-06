@@ -12,7 +12,7 @@ public class TripApproval
 
     public string ApproverName { get; set; } = string.Empty;
 
-    public ApprovalDecision Decision { get; set; }
+    public TripApprovalDecision Decision { get; set; }
 
     public string? Notes { get; set; }
 

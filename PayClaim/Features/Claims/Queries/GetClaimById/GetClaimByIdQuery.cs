@@ -5,7 +5,10 @@ using PayClaim.DTOs.Claim;
 
 namespace PayClaim.Features.Claims.Queries.GetClaimById;
 
-public record GetClaimByIdQuery(Guid Id);
+public record GetClaimByIdQuery(
+    Guid Id,
+    Guid? RequesterEmployeeId,
+    IReadOnlyCollection<string> RequesterRoles);
 
 public class GetClaimByIdHandler
 {
@@ -16,8 +19,61 @@ public class GetClaimByIdHandler
         _context = context;
     }
 
-    public async Task<ClaimDetailDto> Handle(GetClaimByIdQuery query, CancellationToken ct = default)
+    public async Task<ClaimDetailDto> Handle(
+    GetClaimByIdQuery query,
+    CancellationToken ct = default)
     {
+        // 1. Ambil informasi pemilik Claim dan Manager-nya
+        var claimAccess = await _context.Claims
+            .AsNoTracking()
+            .Where(c => c.Id == query.Id)
+            .Select(c => new
+            {
+                c.EmployeeId,
+                ManagerId = c.Employee.ManagerId
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (claimAccess == null)
+        {
+            throw new NotFoundException(
+                $"Claim with ID '{query.Id}' was not found.");
+        }
+
+        // 2. Periksa role pemanggil
+        var isAdmin = query.RequesterRoles
+            .Contains("Admin", StringComparer.OrdinalIgnoreCase);
+
+        var isFinance = query.RequesterRoles
+            .Contains("Finance", StringComparer.OrdinalIgnoreCase);
+
+        var isManager = query.RequesterRoles
+            .Contains("Manager", StringComparer.OrdinalIgnoreCase);
+
+        // 3. Periksa kepemilikan Claim
+        var isOwner = query.RequesterEmployeeId.HasValue &&
+            claimAccess.EmployeeId == query.RequesterEmployeeId.Value;
+
+        // 4. Periksa apakah pemanggil Manager dari pemilik Claim
+        var isManagerOfOwner =
+            isManager &&
+            query.RequesterEmployeeId.HasValue &&
+            claimAccess.ManagerId == query.RequesterEmployeeId.Value;
+
+        // 5. Tentukan apakah user berhak melihat Claim
+        var hasAccess =
+            isAdmin ||
+            isFinance ||
+            isOwner ||
+            isManagerOfOwner;
+
+        if (!hasAccess)
+        {
+            throw new ForbiddenException(
+                "You are not allowed to access this claim.");
+        }
+
+        // 6. Ambil detail Claim
         var claim = await _context.Claims
             .AsNoTracking()
             .Where(c => c.Id == query.Id)
@@ -31,22 +87,28 @@ public class GetClaimByIdHandler
                 SubmittedAt = c.SubmittedAt,
                 Status = c.Status,
                 FilePath = c.FilePath,
+
                 EmployeeId = c.EmployeeId,
                 EmployeeName = c.Employee.FullName,
                 EmployeeNumber = c.Employee.Number,
                 DepartmentName = c.Employee.Department.Name,
+
                 EmployeeBenefitId = c.EmployeeBenefitId,
-                BenefitName = c.EmployeeBenefit != null ? c.EmployeeBenefit.Benefit.Name : null,
+                BenefitName = c.EmployeeBenefit != null
+                    ? c.EmployeeBenefit.Benefit.Name
+                    : null,
+
                 TripProposalId = c.TripProposalId
             })
             .FirstOrDefaultAsync(ct);
 
         if (claim == null)
         {
-            throw new NotFoundException($"Claim with ID '{query.Id}' was not found.");
+            throw new NotFoundException(
+                $"Claim with ID '{query.Id}' was not found.");
         }
 
-        // Ambil riwayat keputusan approval terkait klaim ini
+        // 7. Ambil riwayat approval
         var approvalHistory = await _context.ClaimApprovals
             .AsNoTracking()
             .Where(ca => ca.ClaimId == query.Id)
@@ -65,6 +127,7 @@ public class GetClaimByIdHandler
             .ToListAsync(ct);
 
         claim.ApprovalHistory = approvalHistory;
+
         return claim;
     }
 }

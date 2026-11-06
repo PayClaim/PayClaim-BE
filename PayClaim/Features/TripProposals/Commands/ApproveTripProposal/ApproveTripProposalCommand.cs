@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PayClaim.Common.Constants;
 using PayClaim.Common.Exceptions;
 using PayClaim.Common.Services;
 using PayClaim.Data;
@@ -9,143 +10,247 @@ using PayClaim.Enums;
 
 namespace PayClaim.Features.TripProposals.Commands.ApproveTripProposal;
 
-public record ApproveTripProposalCommand(Guid ProposalId, TripApprovalActionDto Request, Guid? LoggedInApproverId = null);
+public record ApproveTripProposalCommand(
+    Guid ProposalId,
+    TripApprovalActionDto Request,
+    Guid LoggedInApproverId,
+    string[] ApproverRoles);
 
-public class ApproveTripProposalHandler
+public class ApproveTripProposalHandler(
+    IUnitOfWork uow,
+    PayClaimDbContext context,
+    IEmailService emailService)
 {
-    private readonly IUnitOfWork _uow;
-    private readonly PayClaimDbContext _context;
-    private readonly IEmailService _emailService;
-
-    public ApproveTripProposalHandler(IUnitOfWork uow, PayClaimDbContext context, IEmailService emailService)
+    public async Task<TripApprovalHistoryDto> Handle(
+        ApproveTripProposalCommand command,
+        CancellationToken ct = default)
     {
-        _uow = uow;
-        _context = context;
-        _emailService = emailService;
-    }
-
-    public async Task<TripApprovalHistoryDto> Handle(ApproveTripProposalCommand command, CancellationToken ct = default)
-    {
-        var proposal = await _context.TripProposals
+        var proposal = await context.TripProposals
             .Include(tp => tp.Participants)
-            .FirstOrDefaultAsync(tp => tp.Id == command.ProposalId, ct);
+                .ThenInclude(p => p.Employee)
+            .FirstOrDefaultAsync(
+                tp => tp.Id == command.ProposalId, ct);
 
         if (proposal == null)
         {
-            throw new NotFoundException($"Trip proposal with ID '{command.ProposalId}' was not found.");
+            throw new NotFoundException(
+                $"Trip proposal with ID '{command.ProposalId}' was not found.");
         }
 
-        if (proposal.Status != TripProposalStatus.Submitted && proposal.Status != TripProposalStatus.UnderReview)
-        {
-            throw new BusinessRuleException(
-                $"Cannot process trip proposal with status '{proposal.Status}'. Only proposals in 'Submitted' (Manager Review) or 'UnderReview' (Finance Review) can be processed.");
-        }
-
-        byte currentLevel;
-        string roleKeyword;
-        TripProposalStatus nextStatus;
-
-        // 1. Tentukan tingkat persetujuan berdasarkan status saat ini
-        if (proposal.Status == TripProposalStatus.Submitted)
-        {
-            // Level 1: Persetujuan Manager
-            currentLevel = 1;
-            roleKeyword = "Manager";
-
-            nextStatus = command.Request.Decision switch
-            {
-                ApprovalDecision.Approved => TripProposalStatus.UnderReview, // Diteruskan ke Finance untuk set budget
-                ApprovalDecision.NeedsRevision => TripProposalStatus.NeedsRevision, // Minta revisi data peserta
-                ApprovalDecision.Rejected => TripProposalStatus.Rejected,
-                _ => throw new BusinessRuleException("Invalid approval decision.")
-            };
-        }
-        else // proposal.Status == TripProposalStatus.UnderReview
-        {
-            // Level 2: Penetapan Anggaran & Verifikasi oleh Finance
-            currentLevel = 2;
-            roleKeyword = "Finance";
-
-            nextStatus = command.Request.Decision switch
-            {
-                ApprovalDecision.Approved => TripProposalStatus.Approved, // Disetujui final oleh Finance
-                ApprovalDecision.NeedsRevision => TripProposalStatus.NeedsRevision,
-                ApprovalDecision.Rejected => TripProposalStatus.Rejected,
-                _ => throw new BusinessRuleException("Invalid approval decision.")
-            };
-
-            // Jika Finance menyetujui dan memperbarui alokasi anggaran (BPMN: Set Hotel, Transport & Allowance Budget)
-            if (command.Request.Decision == ApprovalDecision.Approved)
-            {
-                if (command.Request.TotalAmount.HasValue && command.Request.TotalAmount.Value > 0)
-                {
-                    proposal.TotalAmount = command.Request.TotalAmount.Value;
-                }
-
-                if (command.Request.Participants != null && command.Request.Participants.Count > 0)
-                {
-                    foreach (var partDto in command.Request.Participants)
-                    {
-                        var participant = proposal.Participants.FirstOrDefault(p => p.EmployeeId == partDto.EmployeeId);
-                        if (participant != null)
-                        {
-                            participant.Amount = partDto.Amount;
-                            participant.IsPic = partDto.IsPic;
-                        }
-                    }
-                }
-            }
-        }
-
-        // 2. Resolusi Approver
-        var approverId = command.Request.ApproverId ?? command.LoggedInApproverId;
-        Employee? approver = null;
-
-        if (approverId.HasValue)
-        {
-            approver = await _uow.Employees.GetByIdAsync(new object[] { approverId.Value }, ct);
-        }
+        var approver = await context.Employees
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                e => e.Id == command.LoggedInApproverId, ct);
 
         if (approver == null)
         {
-            approver = await _context.Employees
-                .Include(e => e.Position)
-                .AsNoTracking()
-                .FirstOrDefaultAsync(e => e.Position.Title.Contains(roleKeyword) || e.Position.Title.Contains("Lead") || e.Position.Title.Contains("Director"), ct)
-                ?? await _context.Employees.AsNoTracking().FirstOrDefaultAsync(ct);
+            throw new NotFoundException(
+                "Approver employee was not found.");
+        }
 
-            if (approver == null)
+        if (!approver.IsActive)
+        {
+            throw new ForbiddenException(
+                "Inactive employees cannot approve trip proposals.");
+        }
+
+        var pic = proposal.Participants
+            .FirstOrDefault(p => p.IsPic);
+
+        if (pic == null)
+        {
+            throw new BusinessRuleException(
+                "Trip proposal does not have a PIC.");
+        }
+
+        if (pic.EmployeeId == approver.Id)
+        {
+            throw new ForbiddenException(
+                "You cannot approve your own trip proposal.");
+        }
+
+        bool hasManagerRole = command.ApproverRoles.Contains(
+            "Manager", StringComparer.OrdinalIgnoreCase);
+
+        bool hasFinanceRole = command.ApproverRoles.Contains(
+            "Finance", StringComparer.OrdinalIgnoreCase);
+
+        bool hasFinanceManagerRole = command.ApproverRoles.Contains(
+            "Finance Manager", StringComparer.OrdinalIgnoreCase);
+
+        byte currentLevel;
+        TripProposalStatus nextStatus;
+        TripApprovalDecision recordedDecision = command.Request.Decision;
+
+        if (proposal.Status == TripProposalStatus.Submitted)
+        {
+            if (!hasManagerRole)
             {
-                throw new NotFoundException($"No eligible approver ({roleKeyword}) found in the system.");
+                throw new ForbiddenException(
+                    "Only Manager can approve this trip proposal.");
             }
+
+            if (pic.Employee.ManagerId != approver.Id)
+            {
+                throw new ForbiddenException(
+                    "You are not the manager of the employee who submitted this proposal.");
+            }
+
+            currentLevel = 1;
+
+            nextStatus = command.Request.Decision switch
+            {
+                TripApprovalDecision.Approved =>
+                    TripProposalStatus.UnderReview,
+
+                TripApprovalDecision.NeedsRevision =>
+                    TripProposalStatus.NeedsRevision,
+
+                TripApprovalDecision.Rejected =>
+                    TripProposalStatus.Rejected,
+
+                _ => throw new BusinessRuleException(
+                    "Invalid approval decision.")
+            };
+        }
+        else if (proposal.Status == TripProposalStatus.UnderReview)
+        {
+            if (!hasFinanceRole)
+            {
+                throw new ForbiddenException(
+                    "Only Finance can process this trip proposal.");
+            }
+
+            currentLevel = 2;
+
+            if (command.Request.Decision == TripApprovalDecision.Approved)
+            {
+                if (command.Request.TotalAmount.HasValue)
+                {
+                    if (command.Request.TotalAmount.Value <= 0)
+                    {
+                        throw new BusinessRuleException(
+                            "Total amount must be greater than zero.");
+                    }
+
+                    proposal.TotalAmount =
+                        command.Request.TotalAmount.Value;
+                }
+
+                if (command.Request.Participants != null &&
+                    command.Request.Participants.Count > 0)
+                {
+                    foreach (var partDto in command.Request.Participants)
+                    {
+                        if (partDto.Amount < 0)
+                        {
+                            throw new BusinessRuleException(
+                                "Participant amount cannot be negative.");
+                        }
+
+                        var participant = proposal.Participants
+                            .FirstOrDefault(
+                                p => p.EmployeeId == partDto.EmployeeId);
+
+                        if (participant == null)
+                        {
+                            throw new BusinessRuleException(
+                                $"Employee '{partDto.EmployeeId}' is not a participant of this proposal.");
+                        }
+
+                        participant.Amount = partDto.Amount;
+                    }
+                }
+
+                if (proposal.TotalAmount >
+                    TripProposalApprovalLimit.FinanceLimit)
+                {
+                    nextStatus =
+                        TripProposalStatus.FinanceManagerReview;
+
+                    recordedDecision =
+                        TripApprovalDecision.ForwardedToFinanceManager;
+                }
+                else
+                {
+                    nextStatus = TripProposalStatus.Approved;
+                }
+            }
+            else
+            {
+                nextStatus = command.Request.Decision switch
+                {
+                    TripApprovalDecision.NeedsRevision =>
+                        TripProposalStatus.NeedsRevision,
+
+                    TripApprovalDecision.Rejected =>
+                        TripProposalStatus.Rejected,
+
+                    _ => throw new BusinessRuleException(
+                        "Invalid approval decision.")
+                };
+            }
+        }
+        else if (proposal.Status ==
+                 TripProposalStatus.FinanceManagerReview)
+        {
+            if (!hasFinanceManagerRole)
+            {
+                throw new ForbiddenException(
+                    "Only Finance Manager can approve this trip proposal.");
+            }
+
+            currentLevel = 3;
+
+            nextStatus = command.Request.Decision switch
+            {
+                TripApprovalDecision.Approved =>
+                    TripProposalStatus.Approved,
+
+                TripApprovalDecision.NeedsRevision =>
+                    TripProposalStatus.NeedsRevision,
+
+                TripApprovalDecision.Rejected =>
+                    TripProposalStatus.Rejected,
+
+                _ => throw new BusinessRuleException(
+                    "Invalid approval decision.")
+            };
+        }
+        else
+        {
+            throw new BusinessRuleException(
+                $"Cannot perform approval on a trip proposal with status '{proposal.Status}'.");
         }
 
         proposal.Status = nextStatus;
-        _uow.TripProposals.Update(proposal);
 
-        // 3. Catat Riwayat Approval
+        uow.TripProposals.Update(proposal);
+
         var approvalRecord = new TripApproval
         {
             TripProposalId = proposal.Id,
             ApproverId = approver.Id,
             ApproverName = approver.FullName,
-            Decision = command.Request.Decision,
+            Decision = recordedDecision,
             Notes = command.Request.Notes,
             ApprovalLevel = currentLevel,
             DecidedAt = DateTime.UtcNow
         };
 
-        await _uow.TripApprovals.AddAsync(approvalRecord, ct);
-        await _uow.SaveChangesAsync(ct);
+        await uow.TripApprovals.AddAsync(
+            approvalRecord, ct);
 
-        // 4. Kirim notifikasi email ke PIC Proposal Perjalanan Dinas
+        await uow.SaveChangesAsync(ct);
+
+        // Kirim notifikasi email ke PIC Proposal Perjalanan Dinas
         var picParticipant = proposal.Participants.FirstOrDefault(p => p.IsPic) ?? proposal.Participants.FirstOrDefault();
         if (picParticipant != null)
         {
-            var picEmp = await _uow.Employees.GetByIdAsync(new object[] { picParticipant.EmployeeId }, ct);
+            var picEmp = await uow.Employees.GetByIdAsync(new object[] { picParticipant.EmployeeId }, ct);
             if (picEmp != null && !string.IsNullOrWhiteSpace(picEmp.Email))
             {
-                await _emailService.SendTripProposalStatusEmailAsync(
+                await emailService.SendTripProposalStatusEmailAsync(
                     picEmp.Email,
                     picEmp.FullName,
                     proposal.Destination,

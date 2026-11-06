@@ -47,6 +47,13 @@ public class GlobalExceptionHandler : IExceptionHandler
                 _logger.LogWarning("Business rule violation: {Message}", businessEx.Message);
                 break;
 
+            case ForbiddenException forbiddenEx:
+                statusCode = StatusCodes.Status403Forbidden;
+                message = "Forbidden access.";
+                errors.Add(forbiddenEx.Message);
+                _logger.LogWarning("Forbidden access: {Message}", forbiddenEx.Message);
+                break;
+
             case UnauthorizedAccessException authEx:
                 statusCode = StatusCodes.Status401Unauthorized;
                 message = "Unauthorized access.";

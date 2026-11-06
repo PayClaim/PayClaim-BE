@@ -32,4 +32,11 @@ public interface IEmailService
         string? approverName,
         string? notes,
         CancellationToken ct = default);
+
+    Task SendPasswordResetEmailAsync(
+        string toEmail,
+        string fullName,
+        string username,
+        string newPassword,
+        CancellationToken ct = default);
 }

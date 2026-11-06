@@ -76,7 +76,6 @@ public class EmailService : IEmailService
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>Selamat Datang di PayClaim</title>
 </head>
 <body style='margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, Helvetica, Arial, sans-serif; color: #334155;'>
     <table width='100%' border='0' cellspacing='0' cellpadding='0' style='padding: 40px 10px;'>
@@ -87,7 +86,7 @@ public class EmailService : IEmailService
                     <tr>
                         <td style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 32px 40px; text-align: left;'>
                             <div style='font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;'>
-                                💼 PayClaim System
+                                PayClaim System
                             </div>
                             <div style='font-size: 13px; color: #94a3b8; margin-top: 4px;'>
                                 HR &amp; Finance Management Portal
@@ -99,33 +98,33 @@ public class EmailService : IEmailService
                     <tr>
                         <td style='padding: 36px 40px;'>
                             <h2 style='margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #0f172a;'>
-                                Selamat Datang, {fullName}! 🎉
+                                Selamat Datang, {fullName}!
                             </h2>
                             <p style='margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: #475569;'>
                                 Akun Anda pada portal <strong>PayClaim</strong> telah berhasil didaftarkan oleh HR Administrator. Anda sekarang dapat mengakses layanan penugasan tunjangan benefit kesehatan dan klaim reimbursement perusahaan.
                             </p>
 
                             <!-- Credentials Box -->
-                            <div style='background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px;'>
-                                <div style='font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; margin-bottom: 12px;'>
+                            <div style='background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; margin-bottom: 24px;'>
+                                <div style='font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; margin-bottom: 16px;'>
                                     Informasi Akun Karyawan
                                 </div>
-                                <table width='100%' style='font-size: 14px; border-collapse: collapse;'>
+                                <table width='100%' style='font-size: 14px; border-collapse: collapse; line-height: 1.5;'>
                                     <tr>
-                                        <td style='padding: 6px 0; color: #64748b; width: 40%;'>Nomor Karyawan (NIP)</td>
-                                        <td style='padding: 6px 0; font-weight: 600; color: #0f172a;'>{employeeNumber}</td>
+                                        <td style='padding: 12px 20px 12px 0; color: #64748b; width: 45%; vertical-align: top;'>Nomor Karyawan (NIP)</td>
+                                        <td style='padding: 12px 0; font-weight: 600; color: #0f172a; vertical-align: top;'>{employeeNumber}</td>
                                     </tr>
                                     <tr>
-                                        <td style='padding: 6px 0; color: #64748b;'>Departemen / Posisi</td>
-                                        <td style='padding: 6px 0; font-weight: 600; color: #0f172a;'>{departmentName} / {positionTitle}</td>
+                                        <td style='padding: 12px 20px 12px 0; color: #64748b; vertical-align: top;'>Departemen / Posisi</td>
+                                        <td style='padding: 12px 0; font-weight: 600; color: #0f172a; vertical-align: top;'>{departmentName} / {positionTitle}</td>
                                     </tr>
                                     <tr>
-                                        <td style='padding: 6px 0; color: #64748b;'>Username</td>
-                                        <td style='padding: 6px 0; font-weight: 700; color: #2563eb; font-family: monospace;'>{username}</td>
+                                        <td style='padding: 12px 20px 12px 0; color: #64748b; vertical-align: top;'>Username</td>
+                                        <td style='padding: 12px 0; font-weight: 700; color: #2563eb; font-family: monospace; font-size: 15px; vertical-align: top;'>{username}</td>
                                     </tr>
                                     <tr>
-                                        <td style='padding: 6px 0; color: #64748b;'>Password Sementara</td>
-                                        <td style='padding: 6px 0; font-weight: 700; color: #dc2626; font-family: monospace;'>{tempPassword}</td>
+                                        <td style='padding: 12px 20px 12px 0; color: #64748b; vertical-align: top;'>Password Sementara</td>
+                                        <td style='padding: 12px 0; font-weight: 700; color: #dc2626; font-family: monospace; font-size: 15px; vertical-align: top;'>{tempPassword}</td>
                                     </tr>
                                 </table>
                             </div>
@@ -287,5 +286,107 @@ public class EmailService : IEmailService
 </html>";
 
         await SendEmailAsync(toEmail, picName, subject, html, ct);
+    }
+
+    public async Task SendPasswordResetEmailAsync(
+        string toEmail,
+        string fullName,
+        string username,
+        string newPassword,
+        CancellationToken ct = default)
+    {
+        var subject = "[PayClaim] Pembaruan Kata Sandi Akun Anda";
+        var loginUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/login";
+
+        var html = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+</head>
+<body style='margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, Helvetica, Arial, sans-serif; color: #334155;'>
+    <table width='100%' border='0' cellspacing='0' cellpadding='0' style='padding: 40px 10px;'>
+        <tr>
+            <td align='center'>
+                <table width='600' border='0' cellspacing='0' cellpadding='0' style='max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0;'>
+                    <!-- Header -->
+                    <tr>
+                        <td style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 32px 40px; text-align: left;'>
+                            <div style='font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;'>
+                                PayClaim System
+                            </div>
+                            <div style='font-size: 13px; color: #94a3b8; margin-top: 4px;'>
+                                HR &amp; Finance Management Portal
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style='padding: 36px 40px;'>
+                            <h2 style='margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #0f172a;'>
+                                Halo, {fullName}
+                            </h2>
+                            <p style='margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: #475569;'>
+                                Kata sandi akun <strong>PayClaim</strong> Anda telah berhasil diatur ulang oleh Administrator. Berikut adalah kredensial baru Anda untuk masuk ke sistem:
+                            </p>
+
+                            <!-- Credentials Box -->
+                            <div style='background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; margin-bottom: 24px;'>
+                                <div style='font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; margin-bottom: 16px;'>
+                                    Kredensial Baru Akun
+                                </div>
+                                <table width='100%' style='font-size: 14px; border-collapse: collapse; line-height: 1.5;'>
+                                    <tr>
+                                        <td style='padding: 10px 20px 10px 0; color: #64748b; width: 45%; vertical-align: top;'>Username</td>
+                                        <td style='padding: 10px 0; font-weight: 700; color: #2563eb; font-family: monospace; font-size: 15px; vertical-align: top;'>{username}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style='padding: 10px 20px 10px 0; color: #64748b; vertical-align: top;'>Kata Sandi Baru</td>
+                                        <td style='padding: 10px 0; font-weight: 700; color: #dc2626; font-family: monospace; font-size: 15px; vertical-align: top;'>{newPassword}</td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- Security Notice -->
+                            <div style='background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 16px; border-radius: 4px; margin-bottom: 28px;'>
+                                <p style='margin: 0; font-size: 13px; color: #92400e; line-height: 1.5;'>
+                                    <strong>Penting:</strong> Demi keamanan akun Anda, silakan segera masuk ke portal dan lakukan perubahan kata sandi ini melalui menu profil/pengaturan akun.
+                                </p>
+                            </div>
+
+                            <!-- CTA Button -->
+                            <div style='text-align: center; margin-bottom: 20px;'>
+                                <a href='{loginUrl}' target='_blank' style='display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);'>
+                                    Masuk ke Portal PayClaim &rarr;
+                                </a>
+                            </div>
+
+                            <p style='text-align: center; margin: 0; font-size: 12px; color: #94a3b8;'>
+                                Atau kunjungi: <a href='{_settings.FrontendUrl}' style='color: #2563eb; text-decoration: underline;'>{_settings.FrontendUrl}</a>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style='background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 40px; text-align: center;'>
+                            <p style='margin: 0; font-size: 12px; color: #94a3b8;'>
+                                &copy; 2026 PayClaim - HR &amp; Finance Management Portal. Seluruh hak cipta dilindungi undang-undang.
+                            </p>
+                            <p style='margin: 4px 0 0 0; font-size: 11px; color: #cbd5e1;'>
+                                Email ini dikirim secara otomatis oleh sistem. Mohon tidak membalas email ini.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>";
+
+        await SendEmailAsync(toEmail, fullName, subject, html, ct);
     }
 }

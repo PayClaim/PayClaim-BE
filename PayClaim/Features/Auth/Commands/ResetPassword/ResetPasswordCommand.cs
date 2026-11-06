@@ -14,24 +14,13 @@ public class ResetPasswordHandler(IUnitOfWork uow, IEmailService emailService)
     public async Task Handle(ResetPasswordCommand command, CancellationToken ct = default)
     {
         var request = command.Request;
-        Account? account = null;
+        var identifier = request.Username.Trim();
 
-        if (request.EmployeeId.HasValue)
-        {
-            account = await uow.Accounts.GetByEmployeeIdWithRolesAsync(request.EmployeeId.Value, ct);
-        }
-        else
-        {
-            var identifier = request.GetIdentifier();
-            if (!string.IsNullOrWhiteSpace(identifier))
-            {
-                account = await uow.Accounts.GetByIdentifierAsync(identifier, ct);
-            }
-        }
+        var account = await uow.Accounts.GetByIdentifierAsync(identifier, ct);
 
         if (account == null)
         {
-            throw new NotFoundException("Account not found with the provided identifier.");
+            throw new NotFoundException("Account not found with the provided username or email.");
         }
 
         if (!account.IsActive)

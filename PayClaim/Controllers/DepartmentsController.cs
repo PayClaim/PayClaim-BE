@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Master;
 using PayClaim.Features.Departments.Commands.UpdataDepartment;
@@ -15,6 +16,7 @@ public class DepartmentsController(
     GetDepartmentByIdQueryHandler getDepartmentByIdHandler, UpdateDepartmentHandler updateDepartmentHandler,
     DeleteDepartmentHandler deleteDepartmentHandler) : ControllerBase
 {
+    [Authorize]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<DepartmentDto>>> GetAll(CancellationToken ct)
     {
@@ -24,6 +26,7 @@ public class DepartmentsController(
         return Ok(departments);
     }
 
+    [Authorize]
     [HttpGet("{id}")]
     public async Task<ActionResult<DepartmentDto>> GetById(string id, CancellationToken ct)
     {
@@ -33,6 +36,7 @@ public class DepartmentsController(
         return Ok(department);
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateDepartmentDto request, CancellationToken ct)
     {
@@ -42,6 +46,7 @@ public class DepartmentsController(
         return Ok("Department created successfully.");
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(string id, [FromBody] UpdateDepartmentDto request, CancellationToken ct)
     {
@@ -51,6 +56,7 @@ public class DepartmentsController(
         return Ok("Department created successfully.");
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id, CancellationToken ct)
     {

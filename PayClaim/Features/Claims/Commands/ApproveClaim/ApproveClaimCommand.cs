@@ -85,6 +85,12 @@ public class ApproveClaimHandler
                 "Approver employee was not found.");
         }
 
+        if (claim.EmployeeId == approver.Id)
+        {
+            throw new ForbiddenException(
+                "You cannot approve your own claim.");
+        }
+
         if (!approver.IsActive)
         {
             throw new ForbiddenException(

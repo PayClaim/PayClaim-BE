@@ -12,27 +12,15 @@ namespace PayClaim.Features.Claims.Commands.CreateClaim;
 //public record CreateClaimCommand(CreateClaimDto Request, Guid? SubmitterEmployeeId = null);
 public record CreateClaimCommand( CreateClaimDto Request, Guid SubmitterEmployeeId);
 
-public class CreateClaimHandler
+public class CreateClaimHandler(IUnitOfWork uow, PayClaimDbContext context, IFileStorageService fileStorage)
 {
-    private readonly IUnitOfWork _uow;
-    private readonly PayClaimDbContext _context;
-    private readonly IFileStorageService _fileStorage;
 
-    public CreateClaimHandler(IUnitOfWork uow, PayClaimDbContext context, IFileStorageService fileStorage)
-    {
-        _uow = uow;
-        _context = context;
-        _fileStorage = fileStorage;
-    }
-
-    public async Task<ClaimDetailDto> Handle(
-        CreateClaimCommand command,
-        CancellationToken ct = default)
+    public async Task<ClaimDetailDto> Handle(CreateClaimCommand command, CancellationToken ct = default)
     {
         var request = command.Request;
 
         // 1. Ambil Employee berdasarkan EmployeeId dari JWT
-        var employee = await _context.Employees
+        var employee = await context.Employees
             .Include(e => e.Department)
             .FirstOrDefaultAsync(
                 e => e.Id == command.SubmitterEmployeeId,
@@ -62,7 +50,7 @@ public class CreateClaimHandler
                         "EmployeeBenefitId is required for Benefit claims.");
                 }
 
-                var empBenefit = await _context.EmployeeBenefits
+                var empBenefit = await context.EmployeeBenefits
                     .Include(eb => eb.Benefit)
                     .FirstOrDefaultAsync(
                         eb => eb.Id == request.EmployeeBenefitId.Value,
@@ -110,7 +98,7 @@ public class CreateClaimHandler
                         "TripProposalId is required for Business Trip Reimbursement claims.");
                 }
 
-                var trip = await _context.TripProposals
+                var trip = await context.TripProposals
                     .Include(tp => tp.Participants)
                     .FirstOrDefaultAsync(
                         tp => tp.Id == request.TripProposalId.Value,
@@ -162,7 +150,7 @@ public class CreateClaimHandler
         if (request.ReceiptFile != null &&
             request.ReceiptFile.Length > 0)
         {
-            filePath = await _fileStorage.SaveFileAsync(
+            filePath = await fileStorage.SaveFileAsync(
                 request.ReceiptFile,
                 "receipts",
                 ct);
@@ -187,9 +175,9 @@ public class CreateClaimHandler
             TripProposalId = request.TripProposalId
         };
 
-        await _uow.Claims.AddAsync(claim, ct);
+        await uow.Claims.AddAsync(claim, ct);
 
-        await _uow.SaveChangesAsync(ct);
+        await uow.SaveChangesAsync(ct);
 
         // 5. Buat Response
         return new ClaimDetailDto

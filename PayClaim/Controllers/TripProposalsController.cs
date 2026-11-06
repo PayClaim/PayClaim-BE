@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Common;
 using PayClaim.DTOs.TripProposal;
@@ -8,19 +9,36 @@ using PayClaim.Features.TripProposals.Commands.CreateTripProposal;
 using PayClaim.Features.TripProposals.Commands.UpdateTripProposal;
 using PayClaim.Features.TripProposals.Queries.GetTripProposalById;
 using PayClaim.Features.TripProposals.Queries.GetTripProposals;
+using System.Security.Claims;
 
 namespace PayClaim.Controllers;
 
 [ApiController]
 [Route("api/trip-proposals")]
 public class TripProposalsController(
-    CreateTripProposalHandler createHandler,
-    GetTripProposalsHandler getListHandler,
-    GetTripProposalByIdHandler getDetailHandler,
-    ApproveTripProposalHandler approveHandler,
-    UpdateTripProposalHandler updateHandler,
-    CompleteTripProposalHandler completeHandler) : ControllerBase
+    CreateTripProposalHandler createHandler, GetTripProposalsHandler getListHandler, GetTripProposalByIdHandler getDetailHandler,
+    ApproveTripProposalHandler approveHandler, UpdateTripProposalHandler updateHandler, CompleteTripProposalHandler completeHandler) : ControllerBase
 {
+    private Guid? GetLoggedInEmployeeId()
+    {
+        var employeeIdClaim = User.FindFirst("EmployeeId")?.Value;
+
+        if (Guid.TryParse(employeeIdClaim, out var employeeId))
+        {
+            return employeeId;
+        }
+
+        return null;
+    }
+
+    private string[] GetLoggedInRoles()
+    {
+        return User.FindAll(ClaimTypes.Role)
+            .Select(c => c.Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     private void FallbackParseParticipants(CreateTripProposalDto request)
     {
         if ((request.Participants == null || request.Participants.Count == 0) && Request.HasFormContentType)
@@ -71,71 +89,200 @@ public class TripProposalsController(
             }
         }
     }
-
+    [Authorize]
     [HttpPost]
     public async Task<IActionResult> Create([FromForm] CreateTripProposalDto request, CancellationToken ct)
     {
+        var employeeId = GetLoggedInEmployeeId();
+
+        if (!employeeId.HasValue)
+        {
+            return Unauthorized(ApiResponse.Fail(
+                "Invalid or missing EmployeeId in token.",
+                StatusCodes.Status401Unauthorized));
+        }
+
         FallbackParseParticipants(request);
-        var result = await createHandler.Handle(new CreateTripProposalCommand(request), ct);
-        return StatusCode(StatusCodes.Status201Created, ApiResponse<TripProposalDetailDto>.Created(result, "Trip proposal submitted successfully."));
+
+        var result = await createHandler.Handle(
+            new CreateTripProposalCommand(request, employeeId.Value), ct);
+
+        return StatusCode(
+            StatusCodes.Status201Created,
+            ApiResponse<TripProposalDetailDto>.Created(
+                result, "Trip proposal submitted successfully."));
     }
 
+    [Authorize]
     [HttpGet]
-    public async Task<ActionResult<PagedResponse<TripProposalListDto>>> GetAll([FromQuery] TripProposalFilterQuery filter, CancellationToken ct)
+    public async Task<ActionResult<PagedResponse<TripProposalListDto>>> GetAll(
+        [FromQuery] TripProposalFilterQuery filter,
+        CancellationToken ct)
     {
-        var result = await getListHandler.Handle(new GetTripProposalsQuery(filter), ct);
+        var employeeId = GetLoggedInEmployeeId();
+        var roles = GetLoggedInRoles();
+
+        bool isAdmin = roles.Contains(
+            "Admin", StringComparer.OrdinalIgnoreCase);
+
+        // EmployeeId wajib untuk pengguna selain Admin.
+        if (!isAdmin &&
+            (!employeeId.HasValue || employeeId.Value == Guid.Empty))
+        {
+            return Unauthorized(ApiResponse.Fail(
+                "Invalid or missing EmployeeId in token.",
+                StatusCodes.Status401Unauthorized));
+        }
+
+        var result = await getListHandler.Handle(
+            new GetTripProposalsQuery(
+                filter,
+                employeeId,
+                roles),
+            ct);
+
         return Ok(result);
     }
 
+    [Authorize]
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<ApiResponse<TripProposalDetailDto>>> GetById([FromRoute] Guid id, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<TripProposalDetailDto>>> GetById(
+        [FromRoute] Guid id,
+        CancellationToken ct)
     {
-        var result = await getDetailHandler.Handle(new GetTripProposalByIdQuery(id), ct);
-        return Ok(ApiResponse<TripProposalDetailDto>.Ok(result, "Trip proposal detail retrieved successfully."));
+        var employeeId = GetLoggedInEmployeeId();
+        var roles = GetLoggedInRoles();
+
+        bool isAdmin = roles.Contains(
+            "Admin", StringComparer.OrdinalIgnoreCase);
+
+        if (!isAdmin &&
+            (!employeeId.HasValue || employeeId.Value == Guid.Empty))
+        {
+            return Unauthorized(ApiResponse.Fail(
+                "Invalid or missing EmployeeId in token.",
+                StatusCodes.Status401Unauthorized));
+        }
+
+        var result = await getDetailHandler.Handle(
+            new GetTripProposalByIdQuery(
+                id,
+                employeeId,
+                roles),
+            ct);
+
+        return Ok(ApiResponse<TripProposalDetailDto>.Ok(
+            result,
+            "Trip proposal detail retrieved successfully."));
     }
 
     /// <summary>
     /// Persetujuan bertingkat SPD:
     /// - Jika status Submitted (1) ➡️ Disetujui Manager, diteruskan ke Finance dengan status UnderReview (2).
     /// - Jika status UnderReview (2) ➡️ Disetujui Finance sekaligus menetapkan budget aktual, status jadi Approved (4).
-    /// </summary>
+    [Authorize(Roles = "Manager,Finance,Finance Manager")]
     [HttpPost("{id:guid}/approve")]
-    public async Task<IActionResult> Approve([FromRoute] Guid id, [FromBody] TripApprovalActionDto request, CancellationToken ct)
+    public async Task<IActionResult> Approve(
+     [FromRoute] Guid id,
+     [FromBody] TripApprovalActionDto request,
+     CancellationToken ct)
     {
-        request.Decision = ApprovalDecision.Approved;
-        var result = await approveHandler.Handle(new ApproveTripProposalCommand(id, request), ct);
-        return Ok(ApiResponse<TripApprovalHistoryDto>.Ok(result, "Trip proposal approval step processed successfully."));
+        var employeeId = GetLoggedInEmployeeId();
+
+        if (!employeeId.HasValue)
+        {
+            return Unauthorized(ApiResponse.Fail(
+                "Invalid or missing EmployeeId in token.",
+                StatusCodes.Status401Unauthorized));
+        }
+
+        request.Decision = TripApprovalDecision.Approved;
+
+        var result = await approveHandler.Handle(
+            new ApproveTripProposalCommand(
+                id,
+                request,
+                employeeId.Value,
+                GetLoggedInRoles()),
+            ct);
+
+        return Ok(ApiResponse<TripApprovalHistoryDto>.Ok(
+            result, "Trip proposal approval step processed successfully."));
     }
 
     /// <summary>
     /// Menolak atau meminta revisi SPD (Manager atau Finance).
     /// </summary>
+    [Authorize(Roles = "Manager,Finance,Finance Manager")]
     [HttpPost("{id:guid}/reject")]
-    public async Task<IActionResult> Reject([FromRoute] Guid id, [FromBody] TripApprovalActionDto request, CancellationToken ct)
+    public async Task<IActionResult> Reject(
+        [FromRoute] Guid id,
+        [FromBody] TripApprovalActionDto request,
+        CancellationToken ct)
     {
-        if (request.Decision != ApprovalDecision.NeedsRevision)
+        var employeeId = GetLoggedInEmployeeId();
+
+        if (!employeeId.HasValue)
         {
-            request.Decision = ApprovalDecision.Rejected;
+            return Unauthorized(ApiResponse.Fail(
+                "Invalid or missing EmployeeId in token.",
+                StatusCodes.Status401Unauthorized));
         }
 
-        var result = await approveHandler.Handle(new ApproveTripProposalCommand(id, request), ct);
-        return Ok(ApiResponse<TripApprovalHistoryDto>.Ok(result, "Trip proposal decision recorded successfully."));
+        if (request.Decision != TripApprovalDecision.NeedsRevision)
+        {
+            request.Decision = TripApprovalDecision.Rejected;
+        }
+
+        var result = await approveHandler.Handle(
+            new ApproveTripProposalCommand(
+                id,
+                request,
+                employeeId.Value,
+                GetLoggedInRoles()),
+            ct);
+
+        return Ok(ApiResponse<TripApprovalHistoryDto>.Ok(
+            result, "Trip proposal decision recorded successfully."));
     }
 
     /// <summary>
     /// Mengedit & mengajukan ulang (Resubmit) SPD yang berstatus NeedsRevision atau Submitted.
     /// </summary>
+    [Authorize]
     [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update([FromRoute] Guid id, [FromForm] CreateTripProposalDto request, CancellationToken ct)
+    public async Task<IActionResult> Update(
+        [FromRoute] Guid id,
+        [FromForm] CreateTripProposalDto request,
+        CancellationToken ct)
     {
+        var employeeId = GetLoggedInEmployeeId();
+
+        if (!employeeId.HasValue)
+        {
+            return Unauthorized(ApiResponse.Fail(
+                "Invalid or missing EmployeeId in token.",
+                StatusCodes.Status401Unauthorized));
+        }
+
         FallbackParseParticipants(request);
-        var result = await updateHandler.Handle(new UpdateTripProposalCommand(id, request), ct);
-        return Ok(ApiResponse<TripProposalDetailDto>.Ok(result, "Trip proposal resubmitted successfully."));
+
+        var result = await updateHandler.Handle(
+            new UpdateTripProposalCommand(
+                id,
+                request,
+                employeeId.Value),
+            ct);
+
+        return Ok(ApiResponse<TripProposalDetailDto>.Ok(
+            result, "Trip proposal resubmitted successfully."));
     }
 
     /// <summary>
     /// Pengumpulan Laporan Pasca-Perjalanan Dinas (Submit Travel Report) ➡️ Status berubah ke Completed (6).
     /// </summary>
+
+    [Authorize]
     [HttpPost("{id:guid}/complete")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> Complete(
@@ -143,7 +290,25 @@ public class TripProposalsController(
         [FromForm] CompleteTripProposalDto request,
         CancellationToken ct)
     {
-        var result = await completeHandler.Handle(new CompleteTripProposalCommand(id, request.ReportFile, request.ReportNotes), ct);
-        return Ok(ApiResponse<TripProposalDetailDto>.Ok(result, "Travel report submitted and trip marked as Completed successfully."));
+        var employeeId = GetLoggedInEmployeeId();
+
+        if (!employeeId.HasValue)
+        {
+            return Unauthorized(ApiResponse.Fail(
+                "Invalid or missing EmployeeId in token.",
+                StatusCodes.Status401Unauthorized));
+        }
+
+        var result = await completeHandler.Handle(
+            new CompleteTripProposalCommand(
+                id,
+                employeeId.Value,
+                request.ReportFile,
+                request.ReportNotes),
+            ct);
+
+        return Ok(ApiResponse<TripProposalDetailDto>.Ok(
+            result,
+            "Travel report submitted and trip marked as Completed successfully."));
     }
 }

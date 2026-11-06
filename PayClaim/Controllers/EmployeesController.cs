@@ -1,4 +1,5 @@
 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Common;
 using PayClaim.DTOs.Master;
@@ -16,6 +17,7 @@ namespace PayClaim.Features.Employees;
 public class EmployeesController(GetEmployeesHandler getEmployeesHandler, GetEmployeeByIdHandler getEmployeeByIdHandler,
     CreateEmployeeHandler createEmployeeHandler, UpdateEmployeeHandler updateEmployeeHandler) : ControllerBase
 {
+    [Authorize]
     [HttpGet]
     public async Task<ActionResult<ApiResponse<List<EmployeeDto>>>> GetAll(CancellationToken ct)
     {
@@ -25,31 +27,40 @@ public class EmployeesController(GetEmployeesHandler getEmployeesHandler, GetEmp
             .Ok(result, "Employees retrieved successfully."));
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<ApiResponse<EmployeeDto>>> GetById(Guid id, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<EmployeeDto>>> GetById(CancellationToken ct)
     {
-        var result = await getEmployeeByIdHandler.Handle(new GetEmployeeByIdQuery(id), ct);
+        var employeeIdClaim = User.FindFirst("EmployeeId")?.Value;
+
+        if (!Guid.TryParse(employeeIdClaim, out var employeeId))
+        {
+            return Unauthorized(ApiResponse.Fail("Invalid or missing EmployeeId in token.",
+                StatusCodes.Status401Unauthorized));
+        }
+        var result = await getEmployeeByIdHandler.Handle(new GetEmployeeByIdQuery(employeeId), ct);
 
         return Ok(ApiResponse<EmployeeDto>
             .Ok(result, "Employees retrieved successfully."));
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateEmployeeDto request, CancellationToken ct)
     {
         var employeeId = await createEmployeeHandler.Handle(new CreateEmployeeCommand(request), ct);
 
-        return CreatedAtAction(nameof(GetById), new { id = employeeId }, new { id = employeeId });
+        return StatusCode(StatusCodes.Status201Created,new { id = employeeId });
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(
     Guid id,
     [FromBody] UpdateEmployeeDto request,
     CancellationToken ct)
     {
-        await updateEmployeeHandler.Handle(
-            new UpdateEmployeeCommand(id, request), ct);
+        await updateEmployeeHandler.Handle(new UpdateEmployeeCommand(id, request), ct);
 
         return NoContent();
     }

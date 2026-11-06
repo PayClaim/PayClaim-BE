@@ -9,24 +9,13 @@ using PayClaim.Enums;
 
 namespace PayClaim.Features.TripProposals.Commands.UpdateTripProposal;
 
-public record UpdateTripProposalCommand(Guid ProposalId, CreateTripProposalDto Request);
+public record UpdateTripProposalCommand(Guid ProposalId, CreateTripProposalDto Request, Guid SubmitterEmployeeId);
 
-public class UpdateTripProposalHandler
+public class UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext context, IFileStorageService fileStorage)
 {
-    private readonly IUnitOfWork _uow;
-    private readonly PayClaimDbContext _context;
-    private readonly IFileStorageService _fileStorage;
-
-    public UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext context, IFileStorageService fileStorage)
-    {
-        _uow = uow;
-        _context = context;
-        _fileStorage = fileStorage;
-    }
-
     public async Task<TripProposalDetailDto> Handle(UpdateTripProposalCommand command, CancellationToken ct = default)
     {
-        var proposal = await _context.TripProposals
+        var proposal = await context.TripProposals
             .Include(tp => tp.Participants)
                 .ThenInclude(p => p.Employee)
             .FirstOrDefaultAsync(tp => tp.Id == command.ProposalId, ct);
@@ -35,6 +24,27 @@ public class UpdateTripProposalHandler
         {
             throw new NotFoundException($"Trip proposal with ID '{command.ProposalId}' was not found.");
         }
+
+
+
+        // Cari PIC proposal yang sekarang.
+        var currentPic = proposal.Participants
+            .FirstOrDefault(p => p.IsPic);
+
+        if (currentPic == null)
+        {
+            throw new BusinessRuleException(
+                "Trip proposal does not have a PIC.");
+        }
+
+        // Hanya PIC yang boleh mengubah proposal.
+        if (currentPic.EmployeeId != command.SubmitterEmployeeId)
+        {
+            throw new ForbiddenException(
+                "Only the PIC can update this trip proposal.");
+        }
+
+
 
         if (proposal.Status != TripProposalStatus.NeedsRevision && proposal.Status != TripProposalStatus.Submitted)
         {
@@ -58,13 +68,34 @@ public class UpdateTripProposalHandler
         // Perbarui file lampiran jika diunggah berkas baru
         if (req.File != null && req.File.Length > 0)
         {
-            proposal.FilePath = await _fileStorage.SaveFileAsync(req.File, "proposals", ct);
+            proposal.FilePath = await fileStorage.SaveFileAsync(req.File, "proposals", ct);
         }
 
         // Perbarui daftar peserta
         if (req.Participants != null && req.Participants.Count > 0)
         {
-            _context.ProposalParticipants.RemoveRange(proposal.Participants);
+
+            //peserta boleh berubah, tetapi PIC tetap orang yang pertama mengajukan proposal.
+            var newPicCount = req.Participants.Count(p => p.IsPic);
+
+            if (newPicCount != 1)
+            {
+                throw new BusinessRuleException(
+                    "Trip proposal must have exactly one PIC.");
+            }
+
+            var newPic = req.Participants.First(p => p.IsPic);
+
+            if (newPic.EmployeeId != command.SubmitterEmployeeId)
+            {
+                throw new ForbiddenException(
+                    "The PIC of this proposal cannot be changed.");
+            }
+
+
+
+
+            context.ProposalParticipants.RemoveRange(proposal.Participants);
 
             proposal.Participants = req.Participants.Select(p => new ProposalParticipant
             {
@@ -78,11 +109,11 @@ public class UpdateTripProposalHandler
         // Kembalikan status ke Submitted (Resubmitted) untuk ditinjau kembali oleh Manager
         proposal.Status = TripProposalStatus.Submitted;
 
-        _uow.TripProposals.Update(proposal);
-        await _uow.SaveChangesAsync(ct);
+        uow.TripProposals.Update(proposal);
+        await uow.SaveChangesAsync(ct);
 
         // Ambil riwayat approval
-        var approvals = await _context.TripApprovals
+        var approvals = await context.TripApprovals
             .Where(a => a.TripProposalId == proposal.Id)
             .OrderBy(a => a.DecidedAt)
             .Select(a => new TripApprovalHistoryDto

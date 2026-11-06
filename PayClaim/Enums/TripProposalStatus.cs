@@ -8,5 +8,6 @@ public enum TripProposalStatus
     Approved = 4,
     Rejected = 5,
     Completed = 6,
-    Cancelled = 7
+    Cancelled = 7,
+    FinanceManagerReview = 8
 }

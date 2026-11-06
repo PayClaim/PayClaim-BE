@@ -24,6 +24,26 @@ public class ClaimsController(
     RejectClaimHandler rejectHandler,
     PayClaimHandler payHandler) : ControllerBase
 {
+    private Guid? GetLoggedInEmployeeId()
+    {
+        var employeeIdClaim = User.FindFirst("EmployeeId")?.Value;
+
+        if (Guid.TryParse(employeeIdClaim, out var employeeId))
+        {
+            return employeeId;
+        }
+
+        return null;
+    }
+
+    private string[] GetLoggedInRoles()
+    {
+        return User.FindAll(ClaimTypes.Role)
+            .Select(c => c.Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     /// <summary>
     /// Mengajukan klaim / reimbursement baru (mendukung lampiran bukti nota/kuitansi via multipart/form-data).
     /// </summary>
@@ -32,17 +52,16 @@ public class ClaimsController(
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> Create([FromForm] CreateClaimDto request, CancellationToken ct)
     {
-        // 1. Ambil EmployeeId dari JWT
-        var employeeIdClaim = User.FindFirst("EmployeeId")?.Value;
+        var employeeId = GetLoggedInEmployeeId();
 
-        if (!Guid.TryParse(employeeIdClaim, out var employeeId))
+        if (!employeeId.HasValue)
         {
-            return Unauthorized(ApiResponse.Fail("Invalid or missing EmployeeId in token.",
+            return Unauthorized(ApiResponse.Fail(
+                "Invalid or missing EmployeeId in token.",
                 StatusCodes.Status401Unauthorized));
         }
 
-        // 2. Kirim EmployeeId dari JWT ke Handler
-        var result = await createHandler.Handle(new CreateClaimCommand(request, employeeId), ct);
+        var result = await createHandler.Handle(new CreateClaimCommand(request, employeeId.Value), ct);
 
         return StatusCode( StatusCodes.Status201Created,ApiResponse<ClaimDetailDto>.Created(result,"Claim submitted successfully."));
     }
@@ -52,17 +71,14 @@ public class ClaimsController(
     /// </summary>
     [Authorize(Roles = "Admin,Manager,Finance")]
     [HttpGet]
-    public async Task<ActionResult<PagedResponse<ClaimListDto>>> GetAll(
-        [FromQuery] ClaimFilterQuery filter,
+    public async Task<ActionResult<PagedResponse<ClaimListDto>>> GetAll([FromQuery] ClaimFilterQuery filter, 
         CancellationToken ct)
     {
         var employeeId = GetLoggedInEmployeeId();
         var roles = GetLoggedInRoles();
 
         var result = await getListHandler.Handle(
-            new GetClaimsQuery(
-                filter,
-                employeeId,
+            new GetClaimsQuery(filter, employeeId,
                 roles),
             ct);
 
@@ -82,10 +98,7 @@ public class ClaimsController(
 
         if (!employeeId.HasValue)
         {
-            return Unauthorized(
-                ApiResponse.Fail(
-                    "Invalid or missing EmployeeId in token.",
-                    StatusCodes.Status401Unauthorized));
+            return Unauthorized(ApiResponse.Fail("Invalid or missing EmployeeId in token.",StatusCodes.Status401Unauthorized));
         }
 
         var roles = GetLoggedInRoles();
@@ -131,19 +144,14 @@ public class ClaimsController(
     /// </summary>
     [Authorize(Roles = "Manager,Finance")]
     [HttpPost("{id:guid}/approve")]
-    public async Task<IActionResult> Approve(
-        [FromRoute] Guid id,
-        [FromBody] ClaimApprovalActionDto request,
-        CancellationToken ct)
+    public async Task<IActionResult> Approve([FromRoute] Guid id, [FromBody] ClaimApprovalActionDto request, CancellationToken ct)
     {
         var approverId = GetLoggedInEmployeeId();
 
         if (!approverId.HasValue)
         {
             return Unauthorized(
-                ApiResponse.Fail(
-                    "Invalid or missing EmployeeId in token.",
-                    StatusCodes.Status401Unauthorized));
+                ApiResponse.Fail("Invalid or missing EmployeeId in token.",StatusCodes.Status401Unauthorized));
         }
 
         var roles = GetLoggedInRoles();
@@ -167,17 +175,41 @@ public class ClaimsController(
     /// <summary>
     /// Menolak atau meminta revisi klaim di tingkat Manager (1) maupun Finance (2).
     /// </summary>
-    [Authorize(Roles = "Manager, Finance")]
+    [Authorize(Roles = "Manager,Finance")]
     [HttpPost("{id:guid}/reject")]
-    public async Task<IActionResult> Reject([FromRoute] Guid id, [FromBody] ClaimApprovalActionDto request, CancellationToken ct)
+    public async Task<IActionResult> Reject(
+       [FromRoute] Guid id,
+       [FromBody] ClaimApprovalActionDto request,
+       CancellationToken ct)
     {
+        var approverId = GetLoggedInEmployeeId();
+
+        if (!approverId.HasValue)
+        {
+            return Unauthorized(ApiResponse.Fail(
+                "Invalid or missing EmployeeId in token.",
+                StatusCodes.Status401Unauthorized));
+        }
+
+        var roles = GetLoggedInRoles();
+
         if (request.Decision != ApprovalDecision.NeedsRevision)
         {
             request.Decision = ApprovalDecision.Rejected;
         }
 
-        var result = await rejectHandler.Handle(new RejectClaimCommand(id, request), ct);
-        return Ok(ApiResponse<ClaimApprovalHistoryDto>.Ok(result, "Claim rejection / revision recorded successfully."));
+        var result = await rejectHandler.Handle(
+            new RejectClaimCommand(
+                id,
+                request,
+                approverId.Value,
+                roles),
+            ct);
+
+        return Ok(
+            ApiResponse<ClaimApprovalHistoryDto>.Ok(
+                result,
+                "Claim rejection / revision recorded successfully."));
     }
 
     /// <summary>
@@ -185,28 +217,30 @@ public class ClaimsController(
     /// </summary>
     [Authorize(Roles = "Finance")]
     [HttpPost("{id:guid}/pay")]
-    public async Task<IActionResult> Pay([FromRoute] Guid id, [FromBody] ClaimApprovalActionDto? request, CancellationToken ct)
+    public async Task<IActionResult> Pay(
+        [FromRoute] Guid id,
+        [FromBody] ClaimApprovalActionDto? request,
+        CancellationToken ct)
     {
-        var result = await payHandler.Handle(new PayClaimCommand(id, request?.Notes, request?.ApproverId), ct);
-        return Ok(ApiResponse<ClaimApprovalHistoryDto>.Ok(result, "Claim marked as Paid and added to payroll successfully."));
-    }
-    private Guid? GetLoggedInEmployeeId()
-    {
-        var employeeIdClaim = User.FindFirst("EmployeeId")?.Value;
+        var payerId = GetLoggedInEmployeeId();
 
-        if (Guid.TryParse(employeeIdClaim, out var employeeId))
+        if (!payerId.HasValue)
         {
-            return employeeId;
+            return Unauthorized(ApiResponse.Fail(
+                "Invalid or missing EmployeeId in token.",
+                StatusCodes.Status401Unauthorized));
         }
 
-        return null;
-    }
+        var result = await payHandler.Handle(
+            new PayClaimCommand(
+                id,
+                request?.Notes,
+                payerId.Value),
+            ct);
 
-    private string[] GetLoggedInRoles()
-    {
-        return User.FindAll(ClaimTypes.Role)
-            .Select(c => c.Value)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        return Ok(
+            ApiResponse<ClaimApprovalHistoryDto>.Ok(
+                result,
+                "Claim marked as Paid and added to payroll successfully."));
     }
 }

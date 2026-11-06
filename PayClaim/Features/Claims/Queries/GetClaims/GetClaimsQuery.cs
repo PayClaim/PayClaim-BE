@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using PayClaim.Common.Exceptions;
 using PayClaim.Data;
 using PayClaim.DTOs.Claim;
 using PayClaim.DTOs.Common;
-using PayClaim.Common.Exceptions;
+using PayClaim.Enums;
 
 namespace PayClaim.Features.Claims.Queries.GetClaims;
 
@@ -12,111 +13,122 @@ public record GetClaimsQuery(
     IReadOnlyCollection<string> RequesterRoles,
     bool IsMyClaims = false);
 
-public class GetClaimsHandler
+public class GetClaimsHandler(PayClaimDbContext context)
 {
-    private readonly PayClaimDbContext _context;
-
-    public GetClaimsHandler(PayClaimDbContext context)
-    {
-        _context = context;
-    }
 
     public async Task<PagedResponse<ClaimListDto>> Handle(
-    GetClaimsQuery query,
-    CancellationToken ct = default)
+        GetClaimsQuery query,
+        CancellationToken ct = default)
     {
         var filter = query.Filter;
+        var roles = query.RequesterRoles ?? Array.Empty<string>();
 
-        var dbQuery = _context.Claims
+        var dbQuery = context.Claims
             .AsNoTracking()
             .AsQueryable();
 
-        var isAdmin = query.RequesterRoles
-            .Contains("Admin", StringComparer.OrdinalIgnoreCase);
+        bool isAdmin = roles.Contains(
+            "Admin", StringComparer.OrdinalIgnoreCase);
 
-        var isFinance = query.RequesterRoles
-            .Contains("Finance", StringComparer.OrdinalIgnoreCase);
+        bool isManager = roles.Contains(
+            "Manager", StringComparer.OrdinalIgnoreCase);
 
-        var isManager = query.RequesterRoles
-            .Contains("Manager", StringComparer.OrdinalIgnoreCase);
+        bool isFinance = roles.Contains(
+            "Finance", StringComparer.OrdinalIgnoreCase);
 
-        // 1. Tentukan data yang boleh diakses
+        // 1. Tentukan data yang boleh diakses.
         if (query.IsMyClaims)
         {
-            if (!query.RequesterEmployeeId.HasValue)
+            if (!query.RequesterEmployeeId.HasValue ||
+                query.RequesterEmployeeId.Value == Guid.Empty)
             {
                 throw new ForbiddenException(
                     "Employee identity is required to access your claims.");
             }
 
-            // Abaikan EmployeeId dari query parameter.
-            // Gunakan EmployeeId dari JWT.
-            filter.EmployeeId = query.RequesterEmployeeId.Value;
+            // Employee hanya melihat Claim miliknya sendiri.
+            // EmployeeId selalu berasal dari JWT.
+            dbQuery = dbQuery.Where(c =>
+                c.EmployeeId == query.RequesterEmployeeId.Value);
         }
-        else if (isAdmin || isFinance)
+        else if (!isAdmin)
         {
-            // Admin dan Finance dapat melihat seluruh Claim.
-            // Filter tambahan tetap boleh digunakan.
-        }
-        else if (isManager)
-        {
-            if (!query.RequesterEmployeeId.HasValue)
+            if (!query.RequesterEmployeeId.HasValue ||
+                query.RequesterEmployeeId.Value == Guid.Empty)
             {
                 throw new ForbiddenException(
-                    "Employee identity is required for Manager access.");
+                    "Employee identity is required.");
             }
 
-            var managerId = query.RequesterEmployeeId.Value;
+            if (!isManager && !isFinance)
+            {
+                throw new ForbiddenException(
+                    "You are not allowed to access all claims.");
+            }
 
-            // Manager dapat melihat Claim sendiri dan Claim bawahannya.
+            var requesterEmployeeId =
+                query.RequesterEmployeeId.Value;
+
+            // Manager hanya melihat Claim Submitted dari bawahan langsung.
+            // Finance melihat Claim yang menunggu approval atau payment.
             dbQuery = dbQuery.Where(c =>
-                c.EmployeeId == managerId ||
-                c.Employee.ManagerId == managerId);
-        }
-        else
-        {
-            throw new ForbiddenException(
-                "You are not allowed to access all claims.");
+                (
+                    isManager &&
+                    c.Status == ClaimStatus.Submitted &&
+                    c.Employee.ManagerId == requesterEmployeeId
+                )
+                ||
+                (
+                    isFinance &&
+                    (
+                        c.Status == ClaimStatus.UnderReview ||
+                        c.Status == ClaimStatus.Approved
+                    )
+                )
+            );
         }
 
-        // 2. Filter berdasarkan jenis Claim
+        // Jika Admin, tidak ada pembatasan akses berdasarkan status.
+        // Admin tetap bisa menggunakan filter di bawah.
+
+        // 2. Filter berdasarkan jenis Claim.
         if (filter.ClaimType.HasValue)
         {
-            dbQuery = dbQuery.Where(
-                c => c.ClaimType == filter.ClaimType.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.ClaimType == filter.ClaimType.Value);
         }
 
-        // 3. Filter berdasarkan status Claim
+        // 3. Filter berdasarkan status Claim.
         if (filter.Status.HasValue)
         {
-            dbQuery = dbQuery.Where(
-                c => c.Status == filter.Status.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.Status == filter.Status.Value);
         }
 
-        // 4. Filter berdasarkan EmployeeId
+        // 4. Filter berdasarkan EmployeeId.
         if (filter.EmployeeId.HasValue)
         {
-            dbQuery = dbQuery.Where(
-                c => c.EmployeeId == filter.EmployeeId.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.EmployeeId == filter.EmployeeId.Value);
         }
 
-        // 5. Filter rentang tanggal transaksi
+        // 5. Filter tanggal transaksi.
         if (filter.StartDate.HasValue)
         {
-            dbQuery = dbQuery.Where(
-                c => c.TransactionDate >= filter.StartDate.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.TransactionDate >= filter.StartDate.Value);
         }
 
         if (filter.EndDate.HasValue)
         {
-            dbQuery = dbQuery.Where(
-                c => c.TransactionDate <= filter.EndDate.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.TransactionDate <= filter.EndDate.Value);
         }
 
-        // 6. Hitung total data
+        // 6. Hitung total data.
         var totalCount = await dbQuery.CountAsync(ct);
 
-        // 7. Pagination dan proyeksi DTO
+        // 7. Pagination dan projection.
         var items = await dbQuery
             .OrderByDescending(c => c.SubmittedAt)
             .Skip((filter.PageNumber - 1) * filter.PageSize)
@@ -132,12 +144,15 @@ public class GetClaimsHandler
                 Status = c.Status,
                 EmployeeId = c.EmployeeId,
                 EmployeeName = c.Employee.FullName,
+
                 BenefitName = c.EmployeeBenefit != null
                     ? c.EmployeeBenefit.Benefit.Name
                     : null,
+
                 TripProposalDescription = c.TripProposal != null
                     ? c.TripProposal.Description
                     : null,
+
                 FilePath = c.FilePath
             })
             .ToListAsync(ct);

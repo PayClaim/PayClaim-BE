@@ -7,7 +7,7 @@ using PayClaim.Enums;
 
 namespace PayClaim.Features.TripProposals.Commands.CreateTripProposal;
 
-public record CreateTripProposalCommand(CreateTripProposalDto Request, Guid? SubmitterEmployeeId = null);
+public record CreateTripProposalCommand(CreateTripProposalDto Request, Guid SubmitterEmployeeId);
 
 public class CreateTripProposalHandler
 {
@@ -41,6 +41,19 @@ public class CreateTripProposalHandler
         {
             throw new BusinessRuleException("A trip proposal must have exactly one Person In Charge (PIC).");
         }
+
+
+
+        // Pastikan PIC adalah Employee yang sedang login.
+        var pic = request.Participants.First(p => p.IsPic);
+
+        if (pic.EmployeeId != command.SubmitterEmployeeId)
+        {
+            throw new ForbiddenException(
+                "Only the logged-in employee can submit a proposal as its PIC.");
+        }
+
+
 
         var duplicateEmployees = request.Participants
             .GroupBy(p => p.EmployeeId)

@@ -66,10 +66,10 @@ public class ClaimsController(
     /// Mengambil detail lengkap klaim berdasarkan ID beserta riwayat approval-nya.
     /// </summary>
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<ApiResponse<ClaimDetailDto>>> GetById([FromRoute] Guid id, CancellationToken ct)
+    public async Task<ActionResult<ClaimDetailDto>> GetById([FromRoute] Guid id, CancellationToken ct)
     {
         var result = await getDetailHandler.Handle(new GetClaimByIdQuery(id), ct);
-        return Ok(ApiResponse<ClaimDetailDto>.Ok(result, "Claim detail retrieved successfully."));
+        return Ok(result);
     }
 
     /// <summary>

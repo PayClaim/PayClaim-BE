@@ -88,10 +88,10 @@ public class TripProposalsController(
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<ApiResponse<TripProposalDetailDto>>> GetById([FromRoute] Guid id, CancellationToken ct)
+    public async Task<ActionResult<TripProposalDetailDto>> GetById([FromRoute] Guid id, CancellationToken ct)
     {
         var result = await getDetailHandler.Handle(new GetTripProposalByIdQuery(id), ct);
-        return Ok(ApiResponse<TripProposalDetailDto>.Ok(result, "Trip proposal detail retrieved successfully."));
+        return Ok(result);
     }
 
     /// <summary>

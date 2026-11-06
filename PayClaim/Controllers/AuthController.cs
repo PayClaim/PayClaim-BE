@@ -28,7 +28,7 @@ public class AuthController(
 
     [HttpGet("me")]
     [Authorize]
-    public async Task<ActionResult<ApiResponse<UserProfileResponseDto>>> GetMe(CancellationToken ct)
+    public async Task<ActionResult<UserProfileResponseDto>> GetMe(CancellationToken ct)
     {
         var accountIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) 
             ?? User.FindFirstValue("AccountId")
@@ -40,7 +40,7 @@ public class AuthController(
         }
 
         var profile = await getMeHandler.Handle(new GetMeQuery(accountId), ct);
-        return Ok(ApiResponse<UserProfileResponseDto>.Ok(profile, "User profile retrieved successfully."));
+        return Ok(profile);
     }
 
     [HttpPut("change-password")]

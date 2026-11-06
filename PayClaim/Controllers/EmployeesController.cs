@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Common;
 using PayClaim.DTOs.Master;
@@ -17,21 +16,19 @@ public class EmployeesController(GetEmployeesHandler getEmployeesHandler, GetEmp
     CreateEmployeeHandler createEmployeeHandler, UpdateEmployeeHandler updateEmployeeHandler) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<List<EmployeeDto>>>> GetAll(CancellationToken ct)
+    public async Task<ActionResult<List<EmployeeDto>>> GetAll(CancellationToken ct)
     {
         var result = await getEmployeesHandler.Handle(new GetEmployeesQuery(), ct);
 
-        return Ok(ApiResponse<List<EmployeeDto>>
-            .Ok(result, "Employees retrieved successfully."));
+        return Ok(result);
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<ApiResponse<EmployeeDto>>> GetById(Guid id, CancellationToken ct)
+    public async Task<ActionResult<EmployeeDto>> GetById(Guid id, CancellationToken ct)
     {
         var result = await getEmployeeByIdHandler.Handle(new GetEmployeeByIdQuery(id), ct);
 
-        return Ok(ApiResponse<EmployeeDto>
-            .Ok(result, "Employees retrieved successfully."));
+        return Ok(result);
     }
 
     [HttpPost]
@@ -54,4 +51,3 @@ public class EmployeesController(GetEmployeesHandler getEmployeesHandler, GetEmp
         return NoContent();
     }
 }
-

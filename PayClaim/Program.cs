@@ -55,6 +55,21 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
+builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var errors = context.ModelState
+            .Where(e => e.Value?.Errors.Count > 0)
+            .SelectMany(e => e.Value!.Errors.Select(err =>
+                string.IsNullOrWhiteSpace(err.ErrorMessage) ? $"{e.Key}: Invalid value." : err.ErrorMessage))
+            .ToList();
+
+        var response = PayClaim.DTOs.Common.ApiResponse.Fail("Validation failed.", StatusCodes.Status400BadRequest, errors);
+        return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(response);
+    };
+});
+
 // DI Services, DbContext, Repositories, Unit of Work, Handlers
 builder.Services.AddPayClaimServices(builder.Configuration);
 

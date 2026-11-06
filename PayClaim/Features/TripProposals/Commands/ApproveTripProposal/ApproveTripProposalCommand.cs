@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.TripProposal;
@@ -14,11 +15,13 @@ public class ApproveTripProposalHandler
 {
     private readonly IUnitOfWork _uow;
     private readonly PayClaimDbContext _context;
+    private readonly IEmailService _emailService;
 
-    public ApproveTripProposalHandler(IUnitOfWork uow, PayClaimDbContext context)
+    public ApproveTripProposalHandler(IUnitOfWork uow, PayClaimDbContext context, IEmailService emailService)
     {
         _uow = uow;
         _context = context;
+        _emailService = emailService;
     }
 
     public async Task<TripApprovalHistoryDto> Handle(ApproveTripProposalCommand command, CancellationToken ct = default)
@@ -35,7 +38,7 @@ public class ApproveTripProposalHandler
         if (proposal.Status != TripProposalStatus.Submitted && proposal.Status != TripProposalStatus.UnderReview)
         {
             throw new BusinessRuleException(
-                $"Cannot perform approval on a trip proposal with status '{proposal.Status}'. Only proposals in 'Submitted' (Manager Review) or 'UnderReview' (Finance Review) can be processed.");
+                $"Cannot process trip proposal with status '{proposal.Status}'. Only proposals in 'Submitted' (Manager Review) or 'UnderReview' (Finance Review) can be processed.");
         }
 
         byte currentLevel;
@@ -134,6 +137,24 @@ public class ApproveTripProposalHandler
 
         await _uow.TripApprovals.AddAsync(approvalRecord, ct);
         await _uow.SaveChangesAsync(ct);
+
+        // 4. Kirim notifikasi email ke PIC Proposal Perjalanan Dinas
+        var picParticipant = proposal.Participants.FirstOrDefault(p => p.IsPic) ?? proposal.Participants.FirstOrDefault();
+        if (picParticipant != null)
+        {
+            var picEmp = await _uow.Employees.GetByIdAsync(new object[] { picParticipant.EmployeeId }, ct);
+            if (picEmp != null && !string.IsNullOrWhiteSpace(picEmp.Email))
+            {
+                await _emailService.SendTripProposalStatusEmailAsync(
+                    picEmp.Email,
+                    picEmp.FullName,
+                    proposal.Destination,
+                    proposal.Status.ToString(),
+                    approver.FullName,
+                    command.Request.Notes,
+                    ct);
+            }
+        }
 
         return new TripApprovalHistoryDto
         {

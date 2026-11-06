@@ -74,6 +74,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Services
+        services.Configure<SmtpSettings>(config.GetSection("Smtp"));
+        services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IFileStorageService, FileStorageService>();
 

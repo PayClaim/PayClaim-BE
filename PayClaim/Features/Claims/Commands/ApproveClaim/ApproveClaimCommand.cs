@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Claim;
@@ -14,11 +15,13 @@ public class ApproveClaimHandler
 {
     private readonly IUnitOfWork _uow;
     private readonly PayClaimDbContext _context;
+    private readonly IEmailService _emailService;
 
-    public ApproveClaimHandler(IUnitOfWork uow, PayClaimDbContext context)
+    public ApproveClaimHandler(IUnitOfWork uow, PayClaimDbContext context, IEmailService emailService)
     {
         _uow = uow;
         _context = context;
+        _emailService = emailService;
     }
 
     public async Task<ClaimApprovalHistoryDto> Handle(ApproveClaimCommand command, CancellationToken ct = default)
@@ -126,6 +129,21 @@ public class ApproveClaimHandler
 
         // 7. Simpan seluruh transaksi ke database
         await _uow.SaveChangesAsync(ct);
+
+        // 8. Kirim notifikasi email ke karyawan
+        var claimant = await _uow.Employees.GetByIdAsync(new object[] { claim.EmployeeId }, ct);
+        if (claimant != null && !string.IsNullOrWhiteSpace(claimant.Email))
+        {
+            await _emailService.SendClaimStatusEmailAsync(
+                claimant.Email,
+                claimant.FullName,
+                claim.Description,
+                claim.Amount,
+                claim.Status.ToString(),
+                approver.FullName,
+                command.Request.Notes,
+                ct);
+        }
 
         return new ClaimApprovalHistoryDto
         {

@@ -1,4 +1,4 @@
-﻿using PayClaim.Common.Exceptions;
+using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
 using PayClaim.Entities;
@@ -9,7 +9,7 @@ namespace PayClaim.Features.Employees.Commands.CreateEmployee;
 
 public record CreateEmployeeCommand(CreateEmployeeDto Request);
 
-public class CreateEmployeeHandler(IUnitOfWork uow)
+public class CreateEmployeeHandler(IUnitOfWork uow, PayClaim.Common.Services.IEmailService emailService)
 {
     public async Task<Guid> Handle(
         CreateEmployeeCommand command,
@@ -218,6 +218,16 @@ public class CreateEmployeeHandler(IUnitOfWork uow)
         }
 
         await uow.SaveChangesAsync(ct);
+
+        await emailService.SendWelcomeEmployeeEmailAsync(
+            employee.Email,
+            employee.FullName,
+            employee.Number,
+            account.Username,
+            "Password123!",
+            department.Name,
+            position.Title,
+            ct);
 
         return employee.Id;
     }

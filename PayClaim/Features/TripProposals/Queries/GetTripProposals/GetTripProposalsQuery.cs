@@ -49,14 +49,9 @@ public class GetTripProposalsHandler(PayClaimDbContext context)
             var employeeId = query.EmployeeId.Value;
 
             dbQuery = dbQuery.Where(tp =>
-
-                // Proposal yang melibatkan Employee sebagai participant atau PIC.
                 tp.Participants.Any(p =>
                     p.EmployeeId == employeeId)
-
                 ||
-
-                // Antrean Manager: proposal bawahan langsung.
                 (
                     isManager &&
                     tp.Status == TripProposalStatus.Submitted &&
@@ -64,18 +59,12 @@ public class GetTripProposalsHandler(PayClaimDbContext context)
                         p.IsPic &&
                         p.Employee.ManagerId == employeeId)
                 )
-
                 ||
-
-                // Antrean Finance: menunggu pemeriksaan Finance.
                 (
                     isFinance &&
                     tp.Status == TripProposalStatus.UnderReview
                 )
-
                 ||
-
-                // Antrean Finance Manager: menunggu persetujuan eskalasi.
                 (
                     isFinanceManager &&
                     tp.Status == TripProposalStatus.FinanceManagerReview
@@ -83,21 +72,18 @@ public class GetTripProposalsHandler(PayClaimDbContext context)
             );
         }
 
-        // Filter tujuan.
         if (!string.IsNullOrWhiteSpace(filter.Destination))
         {
             dbQuery = dbQuery.Where(tp =>
                 tp.Destination.Contains(filter.Destination));
         }
 
-        // Filter status.
         if (filter.Status.HasValue)
         {
             dbQuery = dbQuery.Where(tp =>
                 tp.Status == filter.Status.Value);
         }
 
-        // Filter tanggal mulai.
         if (filter.StartDateFrom.HasValue)
         {
             dbQuery = dbQuery.Where(tp =>
@@ -110,7 +96,6 @@ public class GetTripProposalsHandler(PayClaimDbContext context)
                 tp.StartDate <= filter.StartDateTo.Value);
         }
 
-        // Filter peserta.
         if (filter.EmployeeId.HasValue)
         {
             dbQuery = dbQuery.Where(tp =>

@@ -48,11 +48,9 @@ public class GetTripProposalByIdHandler(PayClaimDbContext context)
             {
                 tp.Status,
 
-                // PIC juga merupakan participant.
                 IsParticipant = tp.Participants.Any(p =>
                     p.EmployeeId == employeeId),
 
-                // Manager langsung dari PIC.
                 PicManagerId = tp.Participants
                     .Where(p => p.IsPic)
                     .Select(p => p.Employee.ManagerId)

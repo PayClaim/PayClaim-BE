@@ -125,7 +125,6 @@ public class TripProposalsController(
         bool isAdmin = roles.Contains(
             "Admin", StringComparer.OrdinalIgnoreCase);
 
-        // EmployeeId wajib untuk pengguna selain Admin.
         if (!isAdmin &&
             (!employeeId.HasValue || employeeId.Value == Guid.Empty))
         {
@@ -176,10 +175,7 @@ public class TripProposalsController(
             "Trip proposal detail retrieved successfully."));
     }
 
-    /// <summary>
-    /// Persetujuan bertingkat SPD:
-    /// - Jika status Submitted (1) ➡️ Disetujui Manager, diteruskan ke Finance dengan status UnderReview (2).
-    /// - Jika status UnderReview (2) ➡️ Disetujui Finance sekaligus menetapkan budget aktual, status jadi Approved (4).
+    
     [Authorize(Roles = "Manager,Finance,Finance Manager")]
     [HttpPost("{id:guid}/approve")]
     public async Task<IActionResult> Approve(
@@ -210,9 +206,7 @@ public class TripProposalsController(
             result, "Trip proposal approval step processed successfully."));
     }
 
-    /// <summary>
-    /// Menolak atau meminta revisi SPD (Manager atau Finance).
-    /// </summary>
+
     [Authorize(Roles = "Manager,Finance,Finance Manager")]
     [HttpPost("{id:guid}/reject")]
     public async Task<IActionResult> Reject(
@@ -246,9 +240,6 @@ public class TripProposalsController(
             result, "Trip proposal decision recorded successfully."));
     }
 
-    /// <summary>
-    /// Mengedit & mengajukan ulang (Resubmit) SPD yang berstatus NeedsRevision atau Submitted.
-    /// </summary>
     [Authorize]
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(
@@ -277,10 +268,6 @@ public class TripProposalsController(
         return Ok(ApiResponse<TripProposalDetailDto>.Ok(
             result, "Trip proposal resubmitted successfully."));
     }
-
-    /// <summary>
-    /// Pengumpulan Laporan Pasca-Perjalanan Dinas (Submit Travel Report) ➡️ Status berubah ke Completed (6).
-    /// </summary>
 
     [Authorize]
     [HttpPost("{id:guid}/complete")]

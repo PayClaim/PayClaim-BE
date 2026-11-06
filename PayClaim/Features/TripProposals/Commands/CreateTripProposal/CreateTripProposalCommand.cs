@@ -24,13 +24,11 @@ public class CreateTripProposalHandler
     {
         var request = command.Request;
 
-        // 1. Validasi Tanggal
         if (request.EndDate < request.StartDate)
         {
             throw new BusinessRuleException("End date cannot be earlier than start date.");
         }
 
-        // 2. Validasi Peserta
         if (request.Participants == null || request.Participants.Count == 0)
         {
             throw new BusinessRuleException("At least one participant is required for a trip proposal.");
@@ -43,8 +41,6 @@ public class CreateTripProposalHandler
         }
 
 
-
-        // Pastikan PIC adalah Employee yang sedang login.
         var pic = request.Participants.First(p => p.IsPic);
 
         if (pic.EmployeeId != command.SubmitterEmployeeId)
@@ -72,7 +68,6 @@ public class CreateTripProposalHandler
             throw new BusinessRuleException($"Sum of participants' budgets ({totalParticipantsAmount:N0}) does not match the proposal total amount ({request.TotalAmount:N0}).");
         }
 
-        // 3. Validasi Keberadaan Employee di DB & Proyeksi Nama/Nomor Karyawan
         var participantDtos = new List<ParticipantItemDto>();
         foreach (var p in request.Participants)
         {
@@ -92,14 +87,12 @@ public class CreateTripProposalHandler
             });
         }
 
-        // 4. Handle Simpan File (TOR / Undangan)
         var filePath = string.Empty;
         if (request.File != null && request.File.Length > 0)
         {
             filePath = await _fileStorage.SaveFileAsync(request.File, "proposals", ct);
         }
 
-        // 5. Inisialisasi Entity Proposal & Participants
         var proposal = new TripProposal
         {
             Id = Guid.NewGuid(),

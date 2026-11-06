@@ -23,7 +23,6 @@ public class ApproveTripProposalHandler(
         ApproveTripProposalCommand command,
         CancellationToken ct = default)
     {
-        // 1. Ambil proposal beserta peserta dan data Employee.
         var proposal = await context.TripProposals
             .Include(tp => tp.Participants)
                 .ThenInclude(p => p.Employee)
@@ -36,7 +35,6 @@ public class ApproveTripProposalHandler(
                 $"Trip proposal with ID '{command.ProposalId}' was not found.");
         }
 
-        // 2. Ambil approver berdasarkan EmployeeId dari JWT.
         var approver = await context.Employees
             .AsNoTracking()
             .FirstOrDefaultAsync(
@@ -54,7 +52,6 @@ public class ApproveTripProposalHandler(
                 "Inactive employees cannot approve trip proposals.");
         }
 
-        // 3. Cari PIC sebagai pengaju proposal.
         var pic = proposal.Participants
             .FirstOrDefault(p => p.IsPic);
 
@@ -64,14 +61,12 @@ public class ApproveTripProposalHandler(
                 "Trip proposal does not have a PIC.");
         }
 
-        // Pengaju tidak boleh menyetujui proposalnya sendiri.
         if (pic.EmployeeId == approver.Id)
         {
             throw new ForbiddenException(
                 "You cannot approve your own trip proposal.");
         }
 
-        // 4. Periksa role yang dimiliki approver.
         bool hasManagerRole = command.ApproverRoles.Contains(
             "Manager", StringComparer.OrdinalIgnoreCase);
 
@@ -85,10 +80,6 @@ public class ApproveTripProposalHandler(
         TripProposalStatus nextStatus;
         TripApprovalDecision recordedDecision = command.Request.Decision;
 
-        // =====================================================
-        // LEVEL 1: DIRECT MANAGER
-        // Status awal: Submitted
-        // =====================================================
         if (proposal.Status == TripProposalStatus.Submitted)
         {
             if (!hasManagerRole)
@@ -97,7 +88,6 @@ public class ApproveTripProposalHandler(
                     "Only Manager can approve this trip proposal.");
             }
 
-            // Pastikan approver adalah atasan langsung PIC.
             if (pic.Employee.ManagerId != approver.Id)
             {
                 throw new ForbiddenException(
@@ -122,10 +112,6 @@ public class ApproveTripProposalHandler(
             };
         }
 
-        // =====================================================
-        // LEVEL 2: FINANCE
-        // Status awal: UnderReview
-        // =====================================================
         else if (proposal.Status == TripProposalStatus.UnderReview)
         {
             if (!hasFinanceRole)
@@ -136,10 +122,9 @@ public class ApproveTripProposalHandler(
 
             currentLevel = 2;
 
-            // Jika Finance menyetujui, perbarui anggaran terlebih dahulu.
             if (command.Request.Decision == TripApprovalDecision.Approved)
             {
-                // Update total anggaran jika Finance mengirim nominal baru.
+
                 if (command.Request.TotalAmount.HasValue)
                 {
                     if (command.Request.TotalAmount.Value <= 0)
@@ -152,7 +137,6 @@ public class ApproveTripProposalHandler(
                         command.Request.TotalAmount.Value;
                 }
 
-                // Update pembagian anggaran peserta jika dikirim.
                 if (command.Request.Participants != null &&
                     command.Request.Participants.Count > 0)
                 {
@@ -178,12 +162,10 @@ public class ApproveTripProposalHandler(
                     }
                 }
 
-                // Periksa limit berdasarkan total anggaran terbaru.
                 if (proposal.TotalAmount >
                     TripProposalApprovalLimit.FinanceLimit)
                 {
-                    // Finance tidak menyetujui final.
-                    // Proposal diteruskan ke Finance Manager.
+
                     nextStatus =
                         TripProposalStatus.FinanceManagerReview;
 
@@ -192,14 +174,12 @@ public class ApproveTripProposalHandler(
                 }
                 else
                 {
-                    // Masih dalam limit Finance.
-                    // Finance boleh menyetujui secara final.
+
                     nextStatus = TripProposalStatus.Approved;
                 }
             }
             else
             {
-                // Finance dapat menolak atau meminta revisi.
                 nextStatus = command.Request.Decision switch
                 {
                     TripApprovalDecision.NeedsRevision =>
@@ -214,10 +194,6 @@ public class ApproveTripProposalHandler(
             }
         }
 
-        // =====================================================
-        // LEVEL 3: FINANCE MANAGER
-        // Status awal: FinanceManagerReview
-        // =====================================================
         else if (proposal.Status ==
                  TripProposalStatus.FinanceManagerReview)
         {
@@ -250,12 +226,10 @@ public class ApproveTripProposalHandler(
                 $"Cannot perform approval on a trip proposal with status '{proposal.Status}'.");
         }
 
-        // 5. Update status proposal.
         proposal.Status = nextStatus;
 
         uow.TripProposals.Update(proposal);
 
-        // 6. Simpan riwayat approval.
         var approvalRecord = new TripApproval
         {
             TripProposalId = proposal.Id,
@@ -272,7 +246,6 @@ public class ApproveTripProposalHandler(
 
         await uow.SaveChangesAsync(ct);
 
-        // 7. Kembalikan riwayat approval.
         return new TripApprovalHistoryDto
         {
             Id = approvalRecord.Id,

@@ -25,9 +25,6 @@ public class UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext contex
             throw new NotFoundException($"Trip proposal with ID '{command.ProposalId}' was not found.");
         }
 
-
-
-        // Cari PIC proposal yang sekarang.
         var currentPic = proposal.Participants
             .FirstOrDefault(p => p.IsPic);
 
@@ -37,7 +34,6 @@ public class UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext contex
                 "Trip proposal does not have a PIC.");
         }
 
-        // Hanya PIC yang boleh mengubah proposal.
         if (currentPic.EmployeeId != command.SubmitterEmployeeId)
         {
             throw new ForbiddenException(
@@ -65,17 +61,14 @@ public class UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext contex
         proposal.TotalAmount = req.TotalAmount;
         proposal.Description = req.Description;
 
-        // Perbarui file lampiran jika diunggah berkas baru
         if (req.File != null && req.File.Length > 0)
         {
             proposal.FilePath = await fileStorage.SaveFileAsync(req.File, "proposals", ct);
         }
 
-        // Perbarui daftar peserta
         if (req.Participants != null && req.Participants.Count > 0)
         {
 
-            //peserta boleh berubah, tetapi PIC tetap orang yang pertama mengajukan proposal.
             var newPicCount = req.Participants.Count(p => p.IsPic);
 
             if (newPicCount != 1)
@@ -92,9 +85,6 @@ public class UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext contex
                     "The PIC of this proposal cannot be changed.");
             }
 
-
-
-
             context.ProposalParticipants.RemoveRange(proposal.Participants);
 
             proposal.Participants = req.Participants.Select(p => new ProposalParticipant
@@ -106,13 +96,12 @@ public class UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext contex
             }).ToList();
         }
 
-        // Kembalikan status ke Submitted (Resubmitted) untuk ditinjau kembali oleh Manager
         proposal.Status = TripProposalStatus.Submitted;
 
         uow.TripProposals.Update(proposal);
         await uow.SaveChangesAsync(ct);
 
-        // Ambil riwayat approval
+
         var approvals = await context.TripApprovals
             .Where(a => a.TripProposalId == proposal.Id)
             .OrderBy(a => a.DecidedAt)

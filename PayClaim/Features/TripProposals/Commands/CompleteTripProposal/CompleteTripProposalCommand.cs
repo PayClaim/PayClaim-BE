@@ -35,15 +35,13 @@ public class CompleteTripProposalHandler(
                 $"Trip proposal with ID '{command.ProposalId}' was not found.");
         }
 
-        // Hanya proposal yang sudah disetujui Finance
-        // yang boleh diselesaikan.
+
         if (proposal.Status != TripProposalStatus.Approved)
         {
             throw new BusinessRuleException(
                 $"Only Approved trip proposals can be completed with a travel report. Current status is '{proposal.Status}'.");
         }
 
-        // Cari PIC.
         var pic = proposal.Participants
             .FirstOrDefault(p => p.IsPic);
 
@@ -53,15 +51,13 @@ public class CompleteTripProposalHandler(
                 "Trip proposal does not have a PIC.");
         }
 
-        // Pastikan yang mengirim laporan adalah PIC.
         if (pic.EmployeeId != command.SubmitterEmployeeId)
         {
             throw new ForbiddenException(
                 "Only the PIC can submit the travel report.");
         }
 
-        // Simpan file laporan.
-        // Catatan: FilePath yang lama akan tergantikan.
+
         if (command.ReportFile != null &&
             command.ReportFile.Length > 0)
         {
@@ -71,14 +67,12 @@ public class CompleteTripProposalHandler(
                 ct);
         }
 
-        // Ubah status menjadi Completed.
         proposal.Status = TripProposalStatus.Completed;
 
         uow.TripProposals.Update(proposal);
 
         await uow.SaveChangesAsync(ct);
 
-        // Ambil riwayat approval Manager dan Finance.
         var approvals = await context.TripApprovals
             .AsNoTracking()
             .Where(a => a.TripProposalId == proposal.Id)

@@ -44,9 +44,6 @@ public class ClaimsController(
             .ToArray();
     }
 
-    /// <summary>
-    /// Mengajukan klaim / reimbursement baru (mendukung lampiran bukti nota/kuitansi via multipart/form-data).
-    /// </summary>
     [Authorize]
     [HttpPost]
     [Consumes("multipart/form-data")]
@@ -66,9 +63,6 @@ public class ClaimsController(
         return StatusCode( StatusCodes.Status201Created,ApiResponse<ClaimDetailDto>.Created(result,"Claim submitted successfully."));
     }
 
-    /// <summary>
-    /// Mengambil riwayat klaim sesuai kewenangan Admin, Manager, atau Finance.
-    /// </summary>
     [Authorize(Roles = "Admin,Manager,Finance")]
     [HttpGet]
     public async Task<ActionResult<PagedResponse<ClaimListDto>>> GetAll([FromQuery] ClaimFilterQuery filter, 
@@ -85,9 +79,6 @@ public class ClaimsController(
         return Ok(result);
     }
 
-    /// <summary>
-    /// Mengambil riwayat Claim milik user yang sedang login.
-    /// </summary>
     [Authorize]
     [HttpGet("my-claims")]
     public async Task<ActionResult<PagedResponse<ClaimListDto>>> GetMyClaims(
@@ -114,9 +105,6 @@ public class ClaimsController(
         return Ok(result);
     }
 
-    /// <summary>
-    /// Mengambil detail Claim jika user memiliki kewenangan.
-    /// </summary>
     [Authorize]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ApiResponse<ClaimDetailDto>>> GetById(
@@ -139,9 +127,6 @@ public class ClaimsController(
                 "Claim detail retrieved successfully."));
     }
 
-    /// <summary>
-    /// Menyetujui Claim sesuai tahap Manager atau Finance.
-    /// </summary>
     [Authorize(Roles = "Manager,Finance")]
     [HttpPost("{id:guid}/approve")]
     public async Task<IActionResult> Approve([FromRoute] Guid id, [FromBody] ClaimApprovalActionDto request, CancellationToken ct)
@@ -172,9 +157,6 @@ public class ClaimsController(
                 "Claim approval step processed successfully."));
     }
 
-    /// <summary>
-    /// Menolak atau meminta revisi klaim di tingkat Manager (1) maupun Finance (2).
-    /// </summary>
     [Authorize(Roles = "Manager,Finance")]
     [HttpPost("{id:guid}/reject")]
     public async Task<IActionResult> Reject(
@@ -212,9 +194,6 @@ public class ClaimsController(
                 "Claim rejection / revision recorded successfully."));
     }
 
-    /// <summary>
-    /// Finalisasi Pencairan Dana ke Payroll / Transfer (Status berubah dari Approved ke Paid/Enum 6).
-    /// </summary>
     [Authorize(Roles = "Finance")]
     [HttpPost("{id:guid}/pay")]
     public async Task<IActionResult> Pay(

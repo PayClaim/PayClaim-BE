@@ -43,7 +43,7 @@ public class DepartmentsController(
         await createDepartmentHandler.Handle(
             new CreateDepartmentCommand(request), ct);
 
-        return Ok("Department created successfully.");
+        return Ok(new { message = "Department created successfully." });
     }
 
     [Authorize(Roles = "Admin")]
@@ -53,7 +53,7 @@ public class DepartmentsController(
         await updateDepartmentHandler.Handle(
             new UpdateDepartmentCommand(id, request), ct);
 
-        return Ok("Department created successfully.");
+        return Ok(new { message = "Department updated successfully." });
     }
 
     [Authorize(Roles = "Admin")]
@@ -63,6 +63,6 @@ public class DepartmentsController(
         await deleteDepartmentHandler.Handle(
             new DeleteDepartmentCommand(id), ct);
 
-        return Ok("Department deleted successfully.");
+        return Ok(new { message = "Department deleted successfully." });
     }
 }

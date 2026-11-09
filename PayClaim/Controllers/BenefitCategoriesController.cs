@@ -58,7 +58,7 @@ public class BenefitCategoriesController(CreateBenefitCategoryHandler createHand
         await updateHandler.Handle(
             new UpdateBenefitCategoryCommand(id, request), ct);
 
-        return Ok("Benefit category updated successfully.");
+        return Ok(new { message = "Benefit category updated successfully." });
     }
 
     [Authorize(Roles = "Admin")]
@@ -70,6 +70,6 @@ public class BenefitCategoriesController(CreateBenefitCategoryHandler createHand
         await deleteHandler.Handle(
             new DeleteBenefitCategoryCommand(id), ct);
 
-        return Ok("Benefit category deleted successfully.");
+        return Ok(new { message = "Benefit category deleted successfully." });
     }
 }

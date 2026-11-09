@@ -61,7 +61,7 @@ public class AuthController(
     }
 
     [HttpPost("reset-password")]
-    [AllowAnonymous]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequestDto request, CancellationToken ct)
     {
         await resetPasswordHandler.Handle(new ResetPasswordCommand(request), ct);

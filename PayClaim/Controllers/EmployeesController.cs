@@ -5,6 +5,7 @@ using PayClaim.DTOs.Master;
 using PayClaim.Features.Employees.Commands.CreateEmployee;
 using PayClaim.Features.Employees.Commands.UpdateEmployee;
 using PayClaim.Features.Employees.Commands.DeleteEmployee;
+using PayClaim.Features.Employees.Commands.ActivateEmployee;
 using PayClaim.Features.Employees.Queries;
 using PayClaim.Features.Employees.Queries.GetEmployeeById;
 using PayClaim.Features.Employees.Queries.GetEmployees;
@@ -19,7 +20,8 @@ public class EmployeesController(
     GetEmployeeByIdHandler getEmployeeByIdHandler,
     CreateEmployeeHandler createEmployeeHandler,
     UpdateEmployeeHandler updateEmployeeHandler,
-    DeleteEmployeeHandler deleteEmployeeHandler) : ControllerBase
+    DeleteEmployeeHandler deleteEmployeeHandler,
+    ActivateEmployeeHandler activateEmployeeHandler) : ControllerBase
 {
     [Authorize]
     [HttpGet]
@@ -66,6 +68,15 @@ public class EmployeesController(
     {
         await deleteEmployeeHandler.Handle(new DeleteEmployeeCommand(id), ct);
 
-        return Ok(new { message = "Employee deleted successfully." });
+        return Ok(new { message = "Employee deactivated successfully." });
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPatch("{id:guid}/activate")]
+    public async Task<IActionResult> Activate(Guid id, CancellationToken ct)
+    {
+        await activateEmployeeHandler.Handle(new ActivateEmployeeCommand(id), ct);
+
+        return Ok(new { message = "Employee activated successfully." });
     }
 }

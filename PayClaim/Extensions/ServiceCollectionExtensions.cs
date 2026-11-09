@@ -33,6 +33,7 @@ using PayClaim.Features.EmployeeBenefits.Query.GetEmployeeBenefits;
 using PayClaim.Features.Employees.Commands.CreateEmployee;
 using PayClaim.Features.Employees.Commands.UpdateEmployee;
 using PayClaim.Features.Employees.Commands.DeleteEmployee;
+using PayClaim.Features.Employees.Commands.ActivateEmployee;
 using PayClaim.Features.Employees.Queries.GetEmployeeById;
 using PayClaim.Features.Employees.Queries.GetEmployees;
 using PayClaim.Features.Master.Departments.Commands.CreateDepartment;
@@ -130,6 +131,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<CreateEmployeeHandler>();
         services.AddScoped<UpdateEmployeeHandler>();
         services.AddScoped<DeleteEmployeeHandler>();
+        services.AddScoped<ActivateEmployeeHandler>();
 
         // Employee Benefit Handlers
         services.AddScoped<GetEmployeeBenefitsHandler>();

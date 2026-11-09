@@ -19,6 +19,9 @@ public class UpdateEmployeeHandler(IUnitOfWork uow)
         if (employee == null)
             throw new NotFoundException("Employee not found.");
 
+        if (!employee.IsActive)
+            throw new BusinessRuleException("Karyawan yang berstatus nonaktif tidak dapat diubah datanya. Silakan aktifkan kembali terlebih dahulu.");
+
         var emailExists = await uow.Employees.ExistsByEmailAsync(
             request.Email, employee.Id, ct);
 
@@ -52,7 +55,7 @@ public class UpdateEmployeeHandler(IUnitOfWork uow)
 
         employee.FullName = request.FullName;
         employee.Email = request.Email;
-        employee.HireDate = request.HireDate;
+        // employee.HireDate bersifat permanen dan tidak dapat diubah setelah registrasi
         employee.PositionId = request.PositionId;
         employee.DepartmentId = request.DepartmentId;
         employee.ManagerId = request.ManagerId;

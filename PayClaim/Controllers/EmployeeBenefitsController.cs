@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Common;
 using PayClaim.DTOs.EmployeeBenefit;
@@ -32,7 +32,7 @@ public class EmployeeBenefitsController(
 
     [Authorize]
     [HttpGet("me")]
-    public async Task<ActionResult<MyBenefitSummaryDto>> GetMyBenefits(CancellationToken ct)
+    public async Task<ActionResult<List<MyBenefitSummaryDto>>> GetMyBenefits(CancellationToken ct)
     {
         var employeeIdClaim = User.FindFirst("EmployeeId")?.Value;
 

@@ -7,7 +7,7 @@ namespace PayClaim.Common.Services;
 public class FileStorageService : IFileStorageService
 {
     private readonly IWebHostEnvironment _environment;
-    private static readonly string[] AllowedExtensions = { ".pdf" };
+    private static readonly string[] AllowedExtensions = { ".pdf", ".jpg", ".jpeg", ".png", ".webp" };
     private const long MaxFileSizeInBytes = 5 * 1024 * 1024; // 5 MB
 
     public FileStorageService(IWebHostEnvironment environment)

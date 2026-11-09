@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Claim;
@@ -14,11 +15,13 @@ public class PayClaimHandler
 {
     private readonly IUnitOfWork _uow;
     private readonly PayClaimDbContext _context;
+    private readonly IEmailService _emailService;
 
-    public PayClaimHandler(IUnitOfWork uow, PayClaimDbContext context)
+    public PayClaimHandler(IUnitOfWork uow, PayClaimDbContext context, IEmailService emailService)
     {
         _uow = uow;
         _context = context;
+        _emailService = emailService;
     }
 
     public async Task<ClaimApprovalHistoryDto> Handle(PayClaimCommand command, CancellationToken ct = default)
@@ -67,6 +70,21 @@ public class PayClaimHandler
 
         await _uow.ClaimApprovals.AddAsync(approvalRecord, ct);
         await _uow.SaveChangesAsync(ct);
+
+        // 7. Kirim notifikasi email pencairan dana ke karyawan
+        var claimant = await _uow.Employees.GetByIdAsync(new object[] { claim.EmployeeId }, ct);
+        if (claimant != null && !string.IsNullOrWhiteSpace(claimant.Email))
+        {
+            await _emailService.SendClaimStatusEmailAsync(
+                claimant.Email,
+                claimant.FullName,
+                claim.Description,
+                claim.Amount,
+                claim.Status.ToString(),
+                disburser.FullName,
+                approvalRecord.Notes,
+                ct);
+        }
 
         return new ClaimApprovalHistoryDto
         {

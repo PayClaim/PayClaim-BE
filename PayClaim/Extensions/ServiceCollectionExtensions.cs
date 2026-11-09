@@ -18,6 +18,7 @@ using PayClaim.Features.Claims.Commands.ApproveClaim;
 using PayClaim.Features.Claims.Commands.CreateClaim;
 using PayClaim.Features.Claims.Commands.PayClaim;
 using PayClaim.Features.Claims.Commands.RejectClaim;
+using PayClaim.Features.Claims.Commands.UpdateClaim;
 using PayClaim.Features.Claims.Queries.GetClaimById;
 using PayClaim.Features.Claims.Queries.GetClaims;
 using PayClaim.Features.BenefitPlans.Commands;
@@ -74,6 +75,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Services
+        services.Configure<SmtpSettings>(config.GetSection("Smtp"));
+        services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IFileStorageService, FileStorageService>();
 
@@ -144,6 +147,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ApproveClaimHandler>();
         services.AddScoped<RejectClaimHandler>();
         services.AddScoped<PayClaimHandler>();
+        services.AddScoped<UpdateClaimHandler>();
 
         return services;
     }

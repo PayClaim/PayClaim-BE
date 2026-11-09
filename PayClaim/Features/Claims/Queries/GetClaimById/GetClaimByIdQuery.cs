@@ -5,7 +5,10 @@ using PayClaim.DTOs.Claim;
 
 namespace PayClaim.Features.Claims.Queries.GetClaimById;
 
-public record GetClaimByIdQuery(Guid Id);
+public record GetClaimByIdQuery(
+    Guid Id,
+    Guid? RequesterEmployeeId,
+    IReadOnlyCollection<string> RequesterRoles);
 
 public class GetClaimByIdHandler
 {
@@ -74,19 +77,25 @@ public class GetClaimByIdHandler
                 SubmittedAt = c.SubmittedAt,
                 Status = c.Status,
                 FilePath = c.FilePath,
+
                 EmployeeId = c.EmployeeId,
                 EmployeeName = c.Employee.FullName,
                 EmployeeNumber = c.Employee.Number,
                 DepartmentName = c.Employee.Department.Name,
+
                 EmployeeBenefitId = c.EmployeeBenefitId,
-                BenefitName = c.EmployeeBenefit != null ? c.EmployeeBenefit.Benefit.Name : null,
+                BenefitName = c.EmployeeBenefit != null
+                    ? c.EmployeeBenefit.Benefit.Name
+                    : null,
+
                 TripProposalId = c.TripProposalId
             })
             .FirstOrDefaultAsync(ct);
 
         if (claim == null)
         {
-            throw new NotFoundException($"Claim with ID '{query.Id}' was not found.");
+            throw new NotFoundException(
+                $"Claim with ID '{query.Id}' was not found.");
         }
 
         var approvalHistory = await _context.ClaimApprovals
@@ -107,6 +116,7 @@ public class GetClaimByIdHandler
             .ToListAsync(ct);
 
         claim.ApprovalHistory = approvalHistory;
+
         return claim;
     }
 }

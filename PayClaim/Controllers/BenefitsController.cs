@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Master;
 using PayClaim.Features.Benefits.Commands;
@@ -10,6 +11,7 @@ namespace PayClaim.Controllers;
 public class BenefitsController(CreateBenefitHandler createHandler, GetBenefitsHandler getAllHandler, GetBenefitByIdHandler getByIdHandler,
     UpdateBenefitHandler updateHandler, DeleteBenefitHandler deleteHandler) : ControllerBase
 {
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<ActionResult<List<BenefitDto>>> GetAll(CancellationToken ct)
     {
@@ -19,6 +21,7 @@ public class BenefitsController(CreateBenefitHandler createHandler, GetBenefitsH
         return Ok(result);
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<BenefitDto>> GetById(Guid id, CancellationToken ct)
     {
@@ -28,6 +31,7 @@ public class BenefitsController(CreateBenefitHandler createHandler, GetBenefitsH
         return Ok(result);
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateBenefitDto request, CancellationToken ct)
     {
@@ -37,6 +41,7 @@ public class BenefitsController(CreateBenefitHandler createHandler, GetBenefitsH
         return Created($"/api/benefits/{id}", new { id });
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateBenefitDto request, CancellationToken ct)
     {
@@ -46,6 +51,7 @@ public class BenefitsController(CreateBenefitHandler createHandler, GetBenefitsH
         return Ok(new { message = "Benefit updated successfully." });
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {

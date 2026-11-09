@@ -1,17 +1,24 @@
 using Microsoft.EntityFrameworkCore;
+using PayClaim.Common.Exceptions;
 using PayClaim.Data;
 using PayClaim.DTOs.Claim;
 using PayClaim.DTOs.Common;
+using PayClaim.Enums;
 
 namespace PayClaim.Features.Claims.Queries.GetClaims;
 
-public record GetClaimsQuery(ClaimFilterQuery Filter);
+public record GetClaimsQuery(
+    ClaimFilterQuery Filter,
+    Guid? RequesterEmployeeId,
+    IReadOnlyCollection<string> RequesterRoles,
+    bool IsMyClaims = false);
 
-public class GetClaimsHandler
+public class GetClaimsHandler(PayClaimDbContext context)
 {
-    private readonly PayClaimDbContext _context;
 
-    public GetClaimsHandler(PayClaimDbContext context)
+    public async Task<PagedResponse<ClaimListDto>> Handle(
+        GetClaimsQuery query,
+        CancellationToken ct = default)
     {
         var filter = query.Filter;
         var roles = query.RequesterRoles ?? Array.Empty<string>();
@@ -78,30 +85,35 @@ public class GetClaimsHandler
 
         if (filter.ClaimType.HasValue)
         {
-            dbQuery = dbQuery.Where(c => c.ClaimType == filter.ClaimType.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.ClaimType == filter.ClaimType.Value);
         }
 
         // 3. Filter berdasarkan status Claim.
         if (filter.Status.HasValue)
         {
-            dbQuery = dbQuery.Where(c => c.Status == filter.Status.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.Status == filter.Status.Value);
         }
 
         // 4. Filter berdasarkan EmployeeId.
         if (filter.EmployeeId.HasValue)
         {
-            dbQuery = dbQuery.Where(c => c.EmployeeId == filter.EmployeeId.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.EmployeeId == filter.EmployeeId.Value);
         }
 
         // 5. Filter tanggal transaksi.
         if (filter.StartDate.HasValue)
         {
-            dbQuery = dbQuery.Where(c => c.TransactionDate >= filter.StartDate.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.TransactionDate >= filter.StartDate.Value);
         }
 
         if (filter.EndDate.HasValue)
         {
-            dbQuery = dbQuery.Where(c => c.TransactionDate <= filter.EndDate.Value);
+            dbQuery = dbQuery.Where(c =>
+                c.TransactionDate <= filter.EndDate.Value);
         }
 
         // 6. Hitung total data.
@@ -123,12 +135,23 @@ public class GetClaimsHandler
                 Status = c.Status,
                 EmployeeId = c.EmployeeId,
                 EmployeeName = c.Employee.FullName,
-                BenefitName = c.EmployeeBenefit != null ? c.EmployeeBenefit.Benefit.Name : null,
-                TripProposalDescription = c.TripProposal != null ? c.TripProposal.Description : null,
+
+                BenefitName = c.EmployeeBenefit != null
+                    ? c.EmployeeBenefit.Benefit.Name
+                    : null,
+
+                TripProposalDescription = c.TripProposal != null
+                    ? c.TripProposal.Description
+                    : null,
+
                 FilePath = c.FilePath
             })
             .ToListAsync(ct);
 
-        return new PagedResponse<ClaimListDto>(items, filter.PageNumber, filter.PageSize, totalCount);
+        return new PagedResponse<ClaimListDto>(
+            items,
+            filter.PageNumber,
+            filter.PageSize,
+            totalCount);
     }
 }

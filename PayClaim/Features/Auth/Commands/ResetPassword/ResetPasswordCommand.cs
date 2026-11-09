@@ -1,5 +1,6 @@
 using BCrypt.Net;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Services;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Auth;
 using PayClaim.Entities;
@@ -8,29 +9,18 @@ namespace PayClaim.Features.Auth.Commands.ResetPassword;
 
 public record ResetPasswordCommand(ResetPasswordRequestDto Request);
 
-public class ResetPasswordHandler(IUnitOfWork uow)
+public class ResetPasswordHandler(IUnitOfWork uow, IEmailService emailService)
 {
     public async Task Handle(ResetPasswordCommand command, CancellationToken ct = default)
     {
         var request = command.Request;
-        Account? account = null;
+        var identifier = request.Username.Trim();
 
-        if (request.EmployeeId.HasValue)
-        {
-            account = await uow.Accounts.GetByEmployeeIdWithRolesAsync(request.EmployeeId.Value, ct);
-        }
-        else
-        {
-            var identifier = request.GetIdentifier();
-            if (!string.IsNullOrWhiteSpace(identifier))
-            {
-                account = await uow.Accounts.GetByIdentifierAsync(identifier, ct);
-            }
-        }
+        var account = await uow.Accounts.GetByIdentifierAsync(identifier, ct);
 
         if (account == null)
         {
-            throw new NotFoundException("Account not found with the provided identifier.");
+            throw new NotFoundException("Account not found with the provided username or email.");
         }
 
         if (!account.IsActive)
@@ -43,5 +33,17 @@ public class ResetPasswordHandler(IUnitOfWork uow)
 
         uow.Accounts.Update(account);
         await uow.SaveChangesAsync(ct);
+
+        // Kirim email notifikasi reset kata sandi ke karyawan
+        var employee = account.Employee ?? await uow.Employees.GetByIdAsync(new object[] { account.EmployeeId }, ct);
+        if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
+        {
+            await emailService.SendPasswordResetEmailAsync(
+                employee.Email,
+                employee.FullName,
+                account.Username,
+                request.NewPassword,
+                ct);
+        }
     }
 }

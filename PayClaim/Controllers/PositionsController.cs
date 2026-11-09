@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Master;
 using PayClaim.Features.Positions.Commands.CreatePosition;
@@ -14,6 +15,7 @@ public class PositionsController(
     CreatePositionHandler createPositionHandler, GetPositionsHandler getPositionsHandler, GetPositionByIdQueryHandler getPositionByIdHandler,
     UpdatePositionHandler updatePositionHandler, DeletePositionHandler deletePositionHandler) : ControllerBase
 {
+    [Authorize]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<PositionDto>>> GetAll(CancellationToken ct)
     {
@@ -23,6 +25,7 @@ public class PositionsController(
         return Ok(positions);
     }
 
+    [Authorize]
     [HttpGet("{id}")]
     public async Task<ActionResult<PositionDto>> GetById(string id, CancellationToken ct)
     {
@@ -32,6 +35,7 @@ public class PositionsController(
         return Ok(position);
     }
 
+    [Authorize (Roles = "Admin")]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreatePositionDto request, CancellationToken ct)
     {
@@ -41,6 +45,7 @@ public class PositionsController(
         return Created($"/api/positions/{id}", new { id });
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(string id, [FromBody] UpdatePositionDto request, CancellationToken ct)
     {
@@ -50,6 +55,7 @@ public class PositionsController(
         return Ok("Position updated successfully.");
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id, CancellationToken ct)
     {

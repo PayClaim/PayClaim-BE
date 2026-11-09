@@ -1,10 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using PayClaim.DTOs.Common;
 using PayClaim.DTOs.EmployeeBenefit;
 using PayClaim.DTOs.Master;
 using PayClaim.Features.EmployeeBenefits.Commands;
 using PayClaim.Features.EmployeeBenefits.Queries;
 using PayClaim.Features.EmployeeBenefits.Queries.GetMyBenefits;
 using PayClaim.Features.EmployeeBenefits.Query.GetEmployeeBenefits;
+using System.Security.Claims;
 
 namespace PayClaim.Controllers;
 
@@ -15,6 +18,7 @@ public class EmployeeBenefitsController(
     GetMyBenefitsHandler getMyHandler,
     AdjustEmployeeBenefitHandler adjustHandler) : ControllerBase
 {
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<MyBenefitSummaryDto>>> GetAll(
         [FromQuery] EmployeeBenefitFilterQuery filter,
@@ -26,15 +30,25 @@ public class EmployeeBenefitsController(
         return Ok(result);
     }
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult<MyBenefitSummaryDto>> GetMyBenefits(Guid id, CancellationToken ct)
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<ActionResult<MyBenefitSummaryDto>> GetMyBenefits(CancellationToken ct)
     {
+        var employeeIdClaim = User.FindFirst("EmployeeId")?.Value;
+
+        if (!Guid.TryParse(employeeIdClaim, out var employeeId))
+        {
+            return Unauthorized(ApiResponse.Fail("Invalid or missing EmployeeId in token.",
+                StatusCodes.Status401Unauthorized));
+        }
+
         var result = await getMyHandler.Handle(
-            new GetMyBenefitsQuery(id), ct);
+            new GetMyBenefitsQuery(employeeId), ct);
 
         return Ok(result);
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPatch("{id}")]
     public async Task<IActionResult> Adjust(
         Guid id,

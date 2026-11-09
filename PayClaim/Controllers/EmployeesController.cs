@@ -25,7 +25,7 @@ public class EmployeesController(GetEmployeesHandler getEmployeesHandler, GetEmp
         return Ok(result);
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<EmployeeDto>> GetById(Guid id, CancellationToken ct)
     {

@@ -119,10 +119,24 @@ public class UpdateClaimHandler
                         $"Cannot submit reimbursement for a trip proposal that is in '{trip.Status}' status. The trip proposal must be 'Approved' or 'Completed' first.");
                 }
 
-                var isParticipant = trip.Participants.Any(p => p.EmployeeId == claim.EmployeeId);
-                if (!isParticipant)
+                var participant = trip.Participants.FirstOrDefault(p => p.EmployeeId == claim.EmployeeId);
+                if (participant == null)
                 {
                     throw new BusinessRuleException("This employee is not registered as a participant in the specified business trip proposal.");
+                }
+
+                var existingClaimedAmount = await _context.Claims
+                    .Where(c => c.TripProposalId == trip.Id &&
+                                c.EmployeeId == claim.EmployeeId &&
+                                c.Id != claim.Id &&
+                                c.Status != ClaimStatus.Rejected)
+                    .SumAsync(c => c.Amount, ct);
+
+                if (existingClaimedAmount + request.Amount > participant.Amount)
+                {
+                    var remainingBudget = Math.Max(0, participant.Amount - existingClaimedAmount);
+                    throw new BusinessRuleException(
+                        $"Claim amount (Rp {request.Amount:N0}) exceeds remaining trip budget for this participant (Rp {remainingBudget:N0} out of allocated Rp {participant.Amount:N0}).");
                 }
 
                 claim.TripProposalId = trip.Id;

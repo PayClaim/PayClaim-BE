@@ -16,10 +16,7 @@ public class CreateEmployeeHandler(IUnitOfWork uow, PayClaim.Common.Services.IEm
         CancellationToken ct)
     {
         var request = command.Request;
-        //if (await uow.Employees.ExistsByNumberAsync(request.Number, null, ct))
-        //{
-        //    throw new ConflictException("Employee number already exists.");
-        //}
+
         var year = DateTime.UtcNow.Year;
         string employeeNumber;
 
@@ -34,11 +31,6 @@ public class CreateEmployeeHandler(IUnitOfWork uow, PayClaim.Common.Services.IEm
         {
             throw new ConflictException("Employee email already exists.");
         }
-
-        //if (await uow.Accounts.ExistsByUsernameAsync(request.Username, ct))
-        //{
-        //    throw new ConflictException("Username already exists.");
-        //}
 
         var baseUsername = string.Concat(request.FullName.Where(char.IsLetterOrDigit)).ToLowerInvariant();
         var username = baseUsername;
@@ -73,51 +65,38 @@ public class CreateEmployeeHandler(IUnitOfWork uow, PayClaim.Common.Services.IEm
             }
         }
 
-        string? roleName = null;
+        var roleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Employee" };
 
         if (request.PositionId == "MGR")
         {
             if (request.DepartmentId == "FIN")
             {
-                roleName = "Finance Manager";
+                roleNames.Add("Finance Manager");
+                roleNames.Add("Finance");
             }
             else
             {
-                roleName = "Manager";
+                roleNames.Add("Manager");
             }
         }
-        else if (
-            request.PositionId == "L1" ||
-            request.PositionId == "L2" ||
-            request.PositionId == "L3" ||
-            request.PositionId == "L4")
+        else if (request.DepartmentId == "FIN")
         {
-            if (request.DepartmentId == "FIN")
-            {
-                roleName = "Finance";
-            }
-            else
-            {
-                roleName = "Employee";
-            }
+            roleNames.Add("Finance");
         }
 
         var roleIds = new List<Guid>();
 
-        if (roleName != null)
+        foreach (var name in roleNames)
         {
-            var role = await uow.Roles.GetByNameAsync(roleName, ct);
+            var role = await uow.Roles.GetByNameAsync(name, ct);
 
-            if (role == null)
+            if (role != null)
             {
-                throw new NotFoundException(
-                    $"Role '{roleName}' was not found.");
+                roleIds.Add(role.Id);
             }
-
-            roleIds.Add(role.Id);
         }
 
-        var benefitPlans = await uow.BenefitPlans.GetByDepartmentAndPositionAsync(request.DepartmentId,request.PositionId,ct);
+        var benefitPlans = await uow.BenefitPlans.GetByDepartmentAndPositionAsync(request.DepartmentId, request.PositionId, ct);
 
         var employeeBenefits = new List<EmployeeBenefit>();
 
@@ -148,7 +127,10 @@ public class CreateEmployeeHandler(IUnitOfWork uow, PayClaim.Common.Services.IEm
                     break;
 
                 case BenefitPeriodType.OneTime:
-                    throw new BusinessRuleException("The end date policy for OneTime benefits has not been configured.");
+                    endDate = request.HireDate
+                        .AddYears(1)
+                        .AddDays(-1);
+                    break;
 
                 default:
                     throw new BusinessRuleException("Invalid benefit period type.");

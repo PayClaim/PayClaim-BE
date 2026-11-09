@@ -61,58 +61,58 @@ public class UpdateEmployeeHandler(IUnitOfWork uow)
         var account = await uow.Accounts.GetByEmployeeIdWithRolesAsync(
             employee.Id, ct);
 
-        if (account == null)
-            throw new NotFoundException("Employee account not found.");
-
-        account.IsActive = request.IsActive;
-
-        var targetRoleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Employee" };
-
-        if (request.PositionId == "MGR")
+        if (account != null)
         {
-            if (request.DepartmentId == "FIN")
+            account.IsActive = request.IsActive;
+
+            var targetRoleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Employee" };
+
+            if (request.PositionId == "MGR")
             {
-                targetRoleNames.Add("Finance Manager");
+                if (request.DepartmentId == "FIN")
+                {
+                    targetRoleNames.Add("Finance Manager");
+                    targetRoleNames.Add("Finance");
+                }
+                else
+                {
+                    targetRoleNames.Add("Manager");
+                }
+            }
+            else if (request.DepartmentId == "FIN")
+            {
                 targetRoleNames.Add("Finance");
             }
-            else
+
+            var automaticRoleNames = new[]
             {
-                targetRoleNames.Add("Manager");
-            }
-        }
-        else if (request.DepartmentId == "FIN")
-        {
-            targetRoleNames.Add("Finance");
-        }
+                "Employee",
+                "Manager",
+                "Finance",
+                "Finance Manager"
+            };
 
-        var automaticRoleNames = new[]
-        {
-            "Employee",
-            "Manager",
-            "Finance",
-            "Finance Manager"
-        };
-
-        foreach (var accountRole in account.AccountRoles.ToList())
-        {
-            if (automaticRoleNames.Contains(accountRole.Role.Name))
+            foreach (var accountRole in account.AccountRoles.ToList())
             {
-                uow.AccountRoles.Delete(accountRole);
-            }
-        }
-
-        foreach (var name in targetRoleNames)
-        {
-            var role = await uow.Roles.GetByNameAsync(name, ct);
-
-            if (role != null)
-            {
-                await uow.AccountRoles.AddAsync(new AccountRole
+                if (automaticRoleNames.Contains(accountRole.Role.Name))
                 {
-                    AccountId = account.Id,
-                    RoleId = role.Id,
-                    AssignedAt = DateTime.UtcNow
-                }, ct);
+                    uow.AccountRoles.Delete(accountRole);
+                }
+            }
+
+            foreach (var name in targetRoleNames)
+            {
+                var role = await uow.Roles.GetByNameAsync(name, ct);
+
+                if (role != null)
+                {
+                    await uow.AccountRoles.AddAsync(new AccountRole
+                    {
+                        AccountId = account.Id,
+                        RoleId = role.Id,
+                        AssignedAt = DateTime.UtcNow
+                    }, ct);
+                }
             }
         }
 

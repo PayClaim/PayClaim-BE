@@ -4,6 +4,7 @@ using PayClaim.DTOs.Common;
 using PayClaim.DTOs.Master;
 using PayClaim.Features.Employees.Commands.CreateEmployee;
 using PayClaim.Features.Employees.Commands.UpdateEmployee;
+using PayClaim.Features.Employees.Commands.DeleteEmployee;
 using PayClaim.Features.Employees.Queries;
 using PayClaim.Features.Employees.Queries.GetEmployeeById;
 using PayClaim.Features.Employees.Queries.GetEmployees;
@@ -13,8 +14,12 @@ namespace PayClaim.Features.Employees;
 
 [ApiController]
 [Route("api/[controller]")]
-public class EmployeesController(GetEmployeesHandler getEmployeesHandler, GetEmployeeByIdHandler getEmployeeByIdHandler,
-    CreateEmployeeHandler createEmployeeHandler, UpdateEmployeeHandler updateEmployeeHandler) : ControllerBase
+public class EmployeesController(
+    GetEmployeesHandler getEmployeesHandler,
+    GetEmployeeByIdHandler getEmployeeByIdHandler,
+    CreateEmployeeHandler createEmployeeHandler,
+    UpdateEmployeeHandler updateEmployeeHandler,
+    DeleteEmployeeHandler deleteEmployeeHandler) : ControllerBase
 {
     [Authorize]
     [HttpGet]
@@ -53,5 +58,14 @@ public class EmployeesController(GetEmployeesHandler getEmployeesHandler, GetEmp
         await updateEmployeeHandler.Handle(new UpdateEmployeeCommand(id, request), ct);
 
         return NoContent();
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        await deleteEmployeeHandler.Handle(new DeleteEmployeeCommand(id), ct);
+
+        return Ok(new { message = "Employee deleted successfully." });
     }
 }

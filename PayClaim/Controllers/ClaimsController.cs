@@ -65,7 +65,7 @@ public class ClaimsController(
         return StatusCode(StatusCodes.Status201Created, ApiResponse<ClaimDetailDto>.Created(result, "Claim submitted successfully."));
     }
 
-    [Authorize(Roles = "Admin,Manager,Finance")]
+    [Authorize(Roles = "Admin,Manager,Finance,Finance Manager")]
     [HttpGet]
     public async Task<ActionResult<PagedResponse<ClaimListDto>>> GetAll([FromQuery] ClaimFilterQuery filter,
         CancellationToken ct)

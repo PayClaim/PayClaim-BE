@@ -40,7 +40,9 @@ public class GetClaimByIdHandler
             .Contains("Admin", StringComparer.OrdinalIgnoreCase);
 
         var isFinance = query.RequesterRoles
-            .Contains("Finance", StringComparer.OrdinalIgnoreCase);
+            .Contains("Finance", StringComparer.OrdinalIgnoreCase) ||
+            query.RequesterRoles
+            .Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
 
         var isManager = query.RequesterRoles
             .Contains("Manager", StringComparer.OrdinalIgnoreCase);

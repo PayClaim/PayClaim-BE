@@ -67,13 +67,17 @@ public class ApproveClaimHandler
         }
 
         // 3. Periksa apakah approver memiliki role yang sesuai
-        var hasRequiredRole = command.ApproverRoles
-            .Contains(requiredRole, StringComparer.OrdinalIgnoreCase);
+        bool isAdmin = command.ApproverRoles.Contains("Admin", StringComparer.OrdinalIgnoreCase);
+        bool isFinanceManager = command.ApproverRoles.Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
+
+        bool hasRequiredRole = isAdmin || (currentLevel == 1
+            ? (command.ApproverRoles.Contains("Manager", StringComparer.OrdinalIgnoreCase) || isFinanceManager)
+            : (command.ApproverRoles.Contains("Finance", StringComparer.OrdinalIgnoreCase) || isFinanceManager));
 
         if (!hasRequiredRole)
         {
             throw new ForbiddenException(
-                $"Only {requiredRole} can approve this claim at the current stage.");
+                $"Only {requiredRole} (or Admin/Finance Manager) can approve this claim at the current stage.");
         }
 
         // 4. Ambil Employee yang sedang melakukan approval
@@ -100,16 +104,25 @@ public class ApproveClaimHandler
                 "Inactive employees cannot approve claims.");
         }
 
-        // 5. Jika Manager, pastikan dia Manager dari pengaju Claim
-        if (requiredRole == "Manager")
+        // 5. Jika Level 1 (Manager), pastikan dia Manager dari pengaju Claim atau Admin
+        if (currentLevel == 1 && !isAdmin)
         {
-            var isManagerOfSubmitter = await _context.Employees
-                .AnyAsync(
-                    e => e.Id == claim.EmployeeId &&
-                         e.ManagerId == approver.Id,
-                    ct);
+            var claimant = await _context.Employees
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => e.Id == claim.EmployeeId, ct);
 
-            if (!isManagerOfSubmitter)
+            if (claimant == null)
+            {
+                throw new NotFoundException("Claimant employee was not found.");
+            }
+
+            if (!claimant.ManagerId.HasValue)
+            {
+                throw new ForbiddenException(
+                    "This employee does not have a direct manager. Only an Admin can approve this claim.");
+            }
+
+            if (claimant.ManagerId.Value != approver.Id)
             {
                 throw new ForbiddenException(
                     "You are not the manager of the employee who submitted this claim.");
@@ -117,7 +130,7 @@ public class ApproveClaimHandler
         }
 
         // 6. Jika Finance menyetujui Benefit Claim, potong saldo Benefit
-        if (requiredRole == "Finance" &&
+        if (currentLevel == 2 &&
             claim.ClaimType == ClaimType.Benefit)
         {
             if (!claim.EmployeeBenefitId.HasValue)
@@ -172,13 +185,13 @@ public class ApproveClaimHandler
         // 9. Simpan seluruh perubahan
         await _uow.SaveChangesAsync(ct);
 
-        // 8. Kirim notifikasi email ke karyawan
-        var claimant = await _uow.Employees.GetByIdAsync(new object[] { claim.EmployeeId }, ct);
-        if (claimant != null && !string.IsNullOrWhiteSpace(claimant.Email))
+        // 10. Kirim notifikasi email ke karyawan
+        var claimantEmp = await _uow.Employees.GetByIdAsync(new object[] { claim.EmployeeId }, ct);
+        if (claimantEmp != null && !string.IsNullOrWhiteSpace(claimantEmp.Email))
         {
             await _emailService.SendClaimStatusEmailAsync(
-                claimant.Email,
-                claimant.FullName,
+                claimantEmp.Email,
+                claimantEmp.FullName,
                 claim.Description,
                 claim.Amount,
                 claim.Status.ToString(),

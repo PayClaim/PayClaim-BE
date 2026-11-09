@@ -78,22 +78,34 @@ public class ApproveTripProposalHandler(
         bool hasFinanceManagerRole = command.ApproverRoles.Contains(
             "Finance Manager", StringComparer.OrdinalIgnoreCase);
 
+        bool hasAdminRole = command.ApproverRoles.Contains(
+            "Admin", StringComparer.OrdinalIgnoreCase);
+
         byte currentLevel;
         TripProposalStatus nextStatus;
         TripApprovalDecision recordedDecision = command.Request.Decision;
 
         if (proposal.Status == TripProposalStatus.Submitted)
         {
-            if (!hasManagerRole)
+            if (!hasManagerRole && !hasFinanceManagerRole && !hasAdminRole)
             {
                 throw new ForbiddenException(
-                    "Only Manager can approve this trip proposal.");
+                    "Only Manager or Admin can approve this trip proposal.");
             }
 
-            if (pic.Employee.ManagerId != approver.Id)
+            if (!hasAdminRole)
             {
-                throw new ForbiddenException(
-                    "You are not the manager of the employee who submitted this proposal.");
+                if (!pic.Employee.ManagerId.HasValue)
+                {
+                    throw new ForbiddenException(
+                        "This employee does not have a direct manager. Only an Admin can approve this proposal.");
+                }
+
+                if (pic.Employee.ManagerId.Value != approver.Id)
+                {
+                    throw new ForbiddenException(
+                        "You are not the manager of the employee who submitted this proposal.");
+                }
             }
 
             currentLevel = 1;
@@ -115,10 +127,10 @@ public class ApproveTripProposalHandler(
         }
         else if (proposal.Status == TripProposalStatus.UnderReview)
         {
-            if (!hasFinanceRole)
+            if (!hasFinanceRole && !hasFinanceManagerRole && !hasAdminRole)
             {
                 throw new ForbiddenException(
-                    "Only Finance can process this trip proposal.");
+                    "Only Finance or Admin can process this trip proposal.");
             }
 
             currentLevel = 2;
@@ -194,10 +206,10 @@ public class ApproveTripProposalHandler(
         else if (proposal.Status ==
                  TripProposalStatus.FinanceManagerReview)
         {
-            if (!hasFinanceManagerRole)
+            if (!hasFinanceManagerRole && !hasAdminRole)
             {
                 throw new ForbiddenException(
-                    "Only Finance Manager can approve this trip proposal.");
+                    "Only Finance Manager or Admin can approve this trip proposal.");
             }
 
             currentLevel = 3;

@@ -174,7 +174,7 @@ public class TripProposalsController(
         return Ok(result);
     }
 
-    [Authorize(Roles = "Manager,Finance,Finance Manager")]
+    [Authorize(Roles = "Manager,Finance,Finance Manager,Admin")]
     [HttpPost("{id:guid}/approve")]
     public async Task<IActionResult> Approve(
      [FromRoute] Guid id,
@@ -204,7 +204,7 @@ public class TripProposalsController(
             result, "Trip proposal approval step processed successfully."));
     }
 
-    [Authorize(Roles = "Manager,Finance,Finance Manager")]
+    [Authorize(Roles = "Manager,Finance,Finance Manager,Admin")]
     [HttpPost("{id:guid}/reject")]
     public async Task<IActionResult> Reject(
         [FromRoute] Guid id,

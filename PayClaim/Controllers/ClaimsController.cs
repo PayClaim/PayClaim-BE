@@ -129,7 +129,7 @@ public class ClaimsController(
         return Ok(result);
     }
 
-    [Authorize(Roles = "Manager,Finance")]
+    [Authorize(Roles = "Manager,Finance,Finance Manager,Admin")]
     [HttpPost("{id:guid}/approve")]
     public async Task<IActionResult> Approve([FromRoute] Guid id, [FromBody] ClaimApprovalActionDto request, CancellationToken ct)
     {
@@ -159,7 +159,7 @@ public class ClaimsController(
                 "Claim approval step processed successfully."));
     }
 
-    [Authorize(Roles = "Manager,Finance")]
+    [Authorize(Roles = "Manager,Finance,Finance Manager,Admin")]
     [HttpPost("{id:guid}/reject")]
     public async Task<IActionResult> Reject(
        [FromRoute] Guid id,
@@ -196,7 +196,7 @@ public class ClaimsController(
                 "Claim rejection / revision recorded successfully."));
     }
 
-    [Authorize(Roles = "Finance")]
+    [Authorize(Roles = "Finance,Finance Manager,Admin")]
     [HttpPost("{id:guid}/pay")]
     public async Task<IActionResult> Pay(
         [FromRoute] Guid id,

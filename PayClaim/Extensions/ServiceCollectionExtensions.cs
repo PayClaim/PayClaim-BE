@@ -37,9 +37,6 @@ using PayClaim.Features.Employees.Queries.GetEmployees;
 using PayClaim.Features.Master.Departments.Commands.CreateDepartment;
 using PayClaim.Features.Master.Departments.Commands.DeleteDepartment;
 using PayClaim.Features.Master.Departments.Queries.GetDepartmentById;
-using PayClaim.Features.Positions.Commands.CreatePosition;
-using PayClaim.Features.Positions.Commands.DeletePosition;
-using PayClaim.Features.Positions.Commands.UpdatePosition;
 using PayClaim.Features.Positions.Queries.GetPositionById;
 using PayClaim.Features.Positions.Queries.GetPositions;
 using PayClaim.Features.TripProposals.Commands.ApproveTripProposal;
@@ -102,11 +99,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<DeleteDepartmentHandler>();
 
         // Position Handlers
-        services.AddScoped<CreatePositionHandler>();
         services.AddScoped<GetPositionsHandler>();
         services.AddScoped<GetPositionByIdQueryHandler>();
-        services.AddScoped<UpdatePositionHandler>();
-        services.AddScoped<DeletePositionHandler>();
 
         // Benefit Category Handlers
         services.AddScoped<CreateBenefitCategoryHandler>();

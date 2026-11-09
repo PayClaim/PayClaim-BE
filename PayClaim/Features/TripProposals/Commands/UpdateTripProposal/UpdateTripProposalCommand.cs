@@ -68,7 +68,6 @@ public class UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext contex
 
         if (req.Participants != null && req.Participants.Count > 0)
         {
-
             var newPicCount = req.Participants.Count(p => p.IsPic);
 
             if (newPicCount != 1)
@@ -85,6 +84,18 @@ public class UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext contex
                     "The PIC of this proposal cannot be changed.");
             }
 
+            if (req.Participants.GroupBy(p => p.EmployeeId).Any(g => g.Count() > 1))
+            {
+                throw new BusinessRuleException("Duplicate participant detected in proposal.");
+            }
+
+            var totalParticipantsAmount = req.Participants.Sum(p => p.Amount);
+            if (totalParticipantsAmount != req.TotalAmount)
+            {
+                throw new BusinessRuleException(
+                    $"Sum of participants' budgets ({totalParticipantsAmount:N0}) does not match the proposal total amount ({req.TotalAmount:N0}).");
+            }
+
             context.ProposalParticipants.RemoveRange(proposal.Participants);
 
             proposal.Participants = req.Participants.Select(p => new ProposalParticipant
@@ -94,6 +105,15 @@ public class UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext contex
                 IsPic = p.IsPic,
                 Amount = p.Amount
             }).ToList();
+        }
+        else
+        {
+            var existingTotal = proposal.Participants.Sum(p => p.Amount);
+            if (existingTotal != req.TotalAmount)
+            {
+                throw new BusinessRuleException(
+                    $"Proposal total amount ({req.TotalAmount:N0}) does not match existing participants' budgets ({existingTotal:N0}).");
+            }
         }
 
         proposal.Status = TripProposalStatus.Submitted;

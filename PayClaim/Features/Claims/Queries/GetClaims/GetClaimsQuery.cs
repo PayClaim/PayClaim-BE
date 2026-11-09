@@ -34,7 +34,9 @@ public class GetClaimsHandler(PayClaimDbContext context)
             "Manager", StringComparer.OrdinalIgnoreCase);
 
         bool isFinance = roles.Contains(
-            "Finance", StringComparer.OrdinalIgnoreCase);
+            "Finance", StringComparer.OrdinalIgnoreCase) ||
+            roles.Contains(
+            "Finance Manager", StringComparer.OrdinalIgnoreCase);
 
         if (query.IsMyClaims)
         {
@@ -69,17 +71,10 @@ public class GetClaimsHandler(PayClaimDbContext context)
             dbQuery = dbQuery.Where(c =>
                 (
                     isManager &&
-                    c.Status == ClaimStatus.Submitted &&
                     c.Employee.ManagerId == requesterEmployeeId
                 )
                 ||
-                (
-                    isFinance &&
-                    (
-                        c.Status == ClaimStatus.UnderReview ||
-                        c.Status == ClaimStatus.Approved
-                    )
-                )
+                isFinance
             );
         }
 

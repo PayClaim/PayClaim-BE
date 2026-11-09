@@ -118,13 +118,26 @@ public class CreateClaimHandler(IUnitOfWork uow, PayClaimDbContext context, IFil
                 }
 
                 // Pastikan pengaju merupakan peserta perjalanan
-                var isParticipant = trip.Participants
-                    .Any(p => p.EmployeeId == employee.Id);
+                var participant = trip.Participants
+                    .FirstOrDefault(p => p.EmployeeId == employee.Id);
 
-                if (!isParticipant)
+                if (participant == null)
                 {
                     throw new BusinessRuleException(
                         "This employee is not registered as a participant in the specified business trip proposal.");
+                }
+
+                var existingClaimedAmount = await context.Claims
+                    .Where(c => c.TripProposalId == trip.Id &&
+                                c.EmployeeId == employee.Id &&
+                                c.Status != ClaimStatus.Rejected)
+                    .SumAsync(c => c.Amount, ct);
+
+                if (existingClaimedAmount + request.Amount > participant.Amount)
+                {
+                    var remainingBudget = Math.Max(0, participant.Amount - existingClaimedAmount);
+                    throw new BusinessRuleException(
+                        $"Claim amount (Rp {request.Amount:N0}) exceeds remaining trip budget for this participant (Rp {remainingBudget:N0} out of allocated Rp {participant.Amount:N0}).");
                 }
 
                 request.EmployeeBenefitId = null;

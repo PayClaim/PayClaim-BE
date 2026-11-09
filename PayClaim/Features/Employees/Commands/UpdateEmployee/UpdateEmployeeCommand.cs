@@ -1,4 +1,4 @@
-﻿using PayClaim.Common.Exceptions;
+using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
 using PayClaim.Entities;
@@ -66,24 +66,23 @@ public class UpdateEmployeeHandler(IUnitOfWork uow)
 
         account.IsActive = request.IsActive;
 
-        string? roleName = null;
+        var targetRoleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Employee" };
 
         if (request.PositionId == "MGR")
         {
             if (request.DepartmentId == "FIN")
-                roleName = "Finance Manager";
+            {
+                targetRoleNames.Add("Finance Manager");
+                targetRoleNames.Add("Finance");
+            }
             else
-                roleName = "Manager";
+            {
+                targetRoleNames.Add("Manager");
+            }
         }
-        else if (request.PositionId == "L1" ||
-                 request.PositionId == "L2" ||
-                 request.PositionId == "L3" ||
-                 request.PositionId == "L4")
+        else if (request.DepartmentId == "FIN")
         {
-            if (request.DepartmentId == "FIN")
-                roleName = "Finance";
-            else
-                roleName = "Employee";
+            targetRoleNames.Add("Finance");
         }
 
         var automaticRoleNames = new[]
@@ -102,19 +101,19 @@ public class UpdateEmployeeHandler(IUnitOfWork uow)
             }
         }
 
-        if (roleName != null)
+        foreach (var name in targetRoleNames)
         {
-            var role = await uow.Roles.GetByNameAsync(roleName, ct);
+            var role = await uow.Roles.GetByNameAsync(name, ct);
 
-            if (role == null)
-                throw new NotFoundException($"Role '{roleName}' was not found.");
-
-            await uow.AccountRoles.AddAsync(new AccountRole
+            if (role != null)
             {
-                AccountId = account.Id,
-                RoleId = role.Id,
-                AssignedAt = DateTime.UtcNow
-            }, ct);
+                await uow.AccountRoles.AddAsync(new AccountRole
+                {
+                    AccountId = account.Id,
+                    RoleId = role.Id,
+                    AssignedAt = DateTime.UtcNow
+                }, ct);
+            }
         }
 
         uow.Employees.Update(employee);

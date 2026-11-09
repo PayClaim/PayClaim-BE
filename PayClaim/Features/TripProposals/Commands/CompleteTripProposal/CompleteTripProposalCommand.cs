@@ -67,6 +67,14 @@ public class CompleteTripProposalHandler(
                 ct);
         }
 
+        if (!string.IsNullOrWhiteSpace(command.ReportNotes))
+        {
+            // shortcut: simpan report notes ke description agar tidak perlu migrasi skema tabel, upgrade jika kolom ReportNotes resmi ditambahkan ke Trip_proposals
+            proposal.Description = string.IsNullOrWhiteSpace(proposal.Description)
+                ? $"[Travel Report]: {command.ReportNotes.Trim()}"
+                : $"{proposal.Description}\n\n[Travel Report]: {command.ReportNotes.Trim()}";
+        }
+
         proposal.Status = TripProposalStatus.Completed;
 
         uow.TripProposals.Update(proposal);

@@ -18,6 +18,49 @@ public class GetClaimByIdHandler
 
     public async Task<ClaimDetailDto> Handle(GetClaimByIdQuery query, CancellationToken ct = default)
     {
+        var claimAccess = await _context.Claims
+            .AsNoTracking()
+            .Where(c => c.Id == query.Id)
+            .Select(c => new
+            {
+                c.EmployeeId,
+                ManagerId = c.Employee.ManagerId
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (claimAccess == null)
+        {
+            throw new NotFoundException(
+                $"Claim with ID '{query.Id}' was not found.");
+        }
+        var isAdmin = query.RequesterRoles
+            .Contains("Admin", StringComparer.OrdinalIgnoreCase);
+
+        var isFinance = query.RequesterRoles
+            .Contains("Finance", StringComparer.OrdinalIgnoreCase);
+
+        var isManager = query.RequesterRoles
+            .Contains("Manager", StringComparer.OrdinalIgnoreCase);
+
+        var isOwner = query.RequesterEmployeeId.HasValue &&
+            claimAccess.EmployeeId == query.RequesterEmployeeId.Value;
+
+        var isManagerOfOwner =
+            isManager &&
+            query.RequesterEmployeeId.HasValue &&
+            claimAccess.ManagerId == query.RequesterEmployeeId.Value;
+
+        var hasAccess =
+            isAdmin ||
+            isFinance ||
+            isOwner ||
+            isManagerOfOwner;
+
+        if (!hasAccess)
+        {
+            throw new ForbiddenException(
+                "You are not allowed to access this claim.");
+        }
         var claim = await _context.Claims
             .AsNoTracking()
             .Where(c => c.Id == query.Id)
@@ -46,7 +89,6 @@ public class GetClaimByIdHandler
             throw new NotFoundException($"Claim with ID '{query.Id}' was not found.");
         }
 
-        // Ambil riwayat keputusan approval terkait klaim ini
         var approvalHistory = await _context.ClaimApprovals
             .AsNoTracking()
             .Where(ca => ca.ClaimId == query.Id)

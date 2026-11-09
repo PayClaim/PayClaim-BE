@@ -9,7 +9,8 @@ using PayClaim.Enums;
 
 namespace PayClaim.Features.Claims.Commands.CreateClaim;
 
-public record CreateClaimCommand(CreateClaimDto Request, Guid? SubmitterEmployeeId = null);
+//public record CreateClaimCommand(CreateClaimDto Request, Guid? SubmitterEmployeeId = null);
+public record CreateClaimCommand( CreateClaimDto Request, Guid SubmitterEmployeeId);
 
 public class CreateClaimHandler
 {
@@ -28,16 +29,12 @@ public class CreateClaimHandler
     {
         var request = command.Request;
 
-        // 1. Resolusi Karyawan Pengaju
-        var employeeId = request.EmployeeId ?? command.SubmitterEmployeeId;
-        Employee? employee = null;
-
-        if (employeeId.HasValue)
-        {
-            employee = await _context.Employees
-                .Include(e => e.Department)
-                .FirstOrDefaultAsync(e => e.Id == employeeId.Value, ct);
-        }
+        // 1. Ambil Employee berdasarkan EmployeeId dari JWT
+        var employee = await context.Employees
+            .Include(e => e.Department)
+            .FirstOrDefaultAsync(
+                e => e.Id == command.SubmitterEmployeeId,
+                ct);
 
         if (employee == null)
         {
@@ -54,7 +51,7 @@ public class CreateClaimHandler
 
         string? benefitName = null;
 
-        // 2. Validasi Aturan Bisnis Berdasarkan Jenis Klaim (ClaimType)
+        // 2. Validasi berdasarkan jenis Claim
         switch (request.ClaimType)
         {
             case ClaimType.Benefit:
@@ -72,16 +69,20 @@ public class CreateClaimHandler
                     throw new NotFoundException($"Employee benefit quota with ID '{request.EmployeeBenefitId.Value}' was not found.");
                 }
 
+                // Pastikan alokasi Benefit memang milik pengaju
                 if (empBenefit.EmployeeId != employee.Id)
                 {
                     throw new BusinessRuleException("The selected benefit quota does not belong to this employee.");
                 }
 
-                if (request.TransactionDate < empBenefit.StartDate || request.TransactionDate > empBenefit.EndDate)
+                // Pastikan tanggal transaksi masuk periode Benefit
+                if (request.TransactionDate < empBenefit.StartDate ||
+                    request.TransactionDate > empBenefit.EndDate)
                 {
                     throw new BusinessRuleException($"Transaction date must be within the active benefit quota period ({empBenefit.StartDate:yyyy-MM-dd} to {empBenefit.EndDate:yyyy-MM-dd}).");
                 }
 
+                // Pastikan saldo mencukupi
                 if (empBenefit.Balance < request.Amount)
                 {
                     throw new BusinessRuleException($"Insufficient benefit quota balance. Current balance is Rp {empBenefit.Balance:N0}, but claim amount requested is Rp {request.Amount:N0}.");
@@ -111,7 +112,10 @@ public class CreateClaimHandler
                     throw new BusinessRuleException($"Cannot submit reimbursement for a trip proposal that is in '{trip.Status}' status. The trip proposal must be 'Approved' first.");
                 }
 
-                var isParticipant = trip.Participants.Any(p => p.EmployeeId == employee.Id);
+                // Pastikan pengaju merupakan peserta perjalanan
+                var isParticipant = trip.Participants
+                    .Any(p => p.EmployeeId == employee.Id);
+
                 if (!isParticipant)
                 {
                     throw new BusinessRuleException("This employee is not registered as a participant in the specified business trip proposal.");
@@ -130,14 +134,14 @@ public class CreateClaimHandler
                 throw new BusinessRuleException("Invalid or unsupported claim type.");
         }
 
-        // 3. Simpan File Bukti Pembayaran / Kuitansi (jika ada)
+        // 3. Simpan file bukti pembayaran jika tersedia
         var filePath = string.Empty;
         if (request.ReceiptFile != null && request.ReceiptFile.Length > 0)
         {
             filePath = await _fileStorage.SaveFileAsync(request.ReceiptFile, "receipts", ct);
         }
 
-        // 4. Inisialisasi & Simpan Entity Klaim via Unit of Work
+        // 4. Buat Entity Claim
         var claim = new Claim
         {
             Id = Guid.NewGuid(),
@@ -153,10 +157,11 @@ public class CreateClaimHandler
             TripProposalId = request.TripProposalId
         };
 
-        await _uow.Claims.AddAsync(claim, ct);
-        await _uow.SaveChangesAsync(ct);
+        await uow.Claims.AddAsync(claim, ct);
 
-        // 5. Kembalikan Response DTO
+        await uow.SaveChangesAsync(ct);
+
+        // 5. Buat Response
         return new ClaimDetailDto
         {
             Id = claim.Id,

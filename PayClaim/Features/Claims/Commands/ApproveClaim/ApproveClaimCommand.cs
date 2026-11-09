@@ -106,11 +106,11 @@ public class ApproveClaimHandler
             }
         }
 
-        // 5. Update Status Klaim
+        // 7. Update status Claim
         claim.Status = nextStatus;
         _uow.Claims.Update(claim);
 
-        // 6. Buat Riwayat Jejak Approval (Audit Trail)
+        // 8. Simpan riwayat approval
         var approvalRecord = new ClaimApproval
         {
             ClaimId = claim.Id,
@@ -124,7 +124,7 @@ public class ApproveClaimHandler
 
         await _uow.ClaimApprovals.AddAsync(approvalRecord, ct);
 
-        // 7. Simpan seluruh transaksi ke database
+        // 9. Simpan seluruh perubahan
         await _uow.SaveChangesAsync(ct);
 
         return new ClaimApprovalHistoryDto

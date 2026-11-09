@@ -21,6 +21,30 @@ public class GetTripProposalsHandler
         var filter = query.Filter;
         var dbQuery = _context.TripProposals.AsNoTracking().AsQueryable();
 
+            dbQuery = dbQuery.Where(tp =>
+                tp.Participants.Any(p =>
+                    p.EmployeeId == employeeId)
+                ||
+                (
+                    isManager &&
+                    tp.Status == TripProposalStatus.Submitted &&
+                    tp.Participants.Any(p =>
+                        p.IsPic &&
+                        p.Employee.ManagerId == employeeId)
+                )
+                ||
+                (
+                    isFinance &&
+                    tp.Status == TripProposalStatus.UnderReview
+                )
+                ||
+                (
+                    isFinanceManager &&
+                    tp.Status == TripProposalStatus.FinanceManagerReview
+                )
+            );
+        }
+
         // 1. Filter Pencarian Tujuan
         if (!string.IsNullOrWhiteSpace(filter.Destination))
         {

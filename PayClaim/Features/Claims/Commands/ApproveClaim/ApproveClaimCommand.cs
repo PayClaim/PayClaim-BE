@@ -29,8 +29,8 @@ public class ApproveClaimHandler
     }
 
     public async Task<ClaimApprovalHistoryDto> Handle(
-    ApproveClaimCommand command,
-    CancellationToken ct = default)
+        ApproveClaimCommand command,
+        CancellationToken ct = default)
     {
         // 1. Ambil Claim
         var claim = await _uow.Claims.GetByIdAsync(
@@ -185,8 +185,12 @@ public class ApproveClaimHandler
         // 9. Simpan seluruh perubahan
         await _uow.SaveChangesAsync(ct);
 
-        // 10. Kirim notifikasi email ke karyawan
-        var claimantEmp = await _uow.Employees.GetByIdAsync(new object[] { claim.EmployeeId }, ct);
+        // 10. Ambil data pengaju klaim (claimant) untuk kirim email notifikasi
+        var claimantEmp = await _context.Employees
+            .Include(e => e.Department)
+            .FirstOrDefaultAsync(e => e.Id == claim.EmployeeId, ct);
+
+        // 11. Notifikasi ke bawahan/pengaju klaim mengenai perubahan status
         if (claimantEmp != null && !string.IsNullOrWhiteSpace(claimantEmp.Email))
         {
             await _emailService.SendClaimStatusEmailAsync(
@@ -197,7 +201,35 @@ public class ApproveClaimHandler
                 claim.Status.ToString(),
                 approver.FullName,
                 command.Request.Notes,
+                claim.Id,
                 ct);
+        }
+
+        // 12. Jika disetujui Manajer (Level 1 / status UnderReview), kirim notifikasi ke Tim Finance
+        if (currentLevel == 1)
+        {
+            var financeUsers = await _context.Accounts
+                .Where(a => a.IsActive && a.AccountRoles.Any(ar => ar.Role.Name == "Finance" || ar.Role.Name == "Finance Manager"))
+                .Select(a => new { a.Employee.Email, a.Employee.FullName })
+                .Where(x => !string.IsNullOrEmpty(x.Email))
+                .Distinct()
+                .ToListAsync(ct);
+
+            foreach (var fin in financeUsers)
+            {
+                await _emailService.SendClaimApprovedToFinanceEmailAsync(
+                    fin.Email,
+                    fin.FullName,
+                    claimantEmp?.FullName ?? "Karyawan",
+                    claimantEmp?.Department?.Name ?? "-",
+                    claim.ClaimType.ToString(),
+                    claim.Description,
+                    claim.Amount,
+                    approver.FullName,
+                    command.Request.Notes,
+                    claim.Id,
+                    ct);
+            }
         }
 
         return new ClaimApprovalHistoryDto

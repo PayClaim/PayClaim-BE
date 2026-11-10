@@ -63,7 +63,7 @@ public class PayClaimHandler
             ApproverId = disburser.Id,
             ApproverName = disburser.FullName,
             Decision = ApprovalDecision.Approved,
-            Notes = command.Notes ?? "Dana reimburse berhasil dicairkan ke payroll / ditransfer.",
+            Notes = command.Notes ?? "Dana reimburse berhasil dicairkan dan dimasukkan ke dalam payroll selanjutnya.",
             ApprovalLevel = 3, 
             DecidedAt = DateTime.UtcNow
         };
@@ -71,7 +71,7 @@ public class PayClaimHandler
         await _uow.ClaimApprovals.AddAsync(approvalRecord, ct);
         await _uow.SaveChangesAsync(ct);
 
-        // 7. Kirim notifikasi email pencairan dana ke karyawan
+        // 7. Kirim notifikasi email pencairan dana ke karyawan (payroll selanjutnya)
         var claimant = await _uow.Employees.GetByIdAsync(new object[] { claim.EmployeeId }, ct);
         if (claimant != null && !string.IsNullOrWhiteSpace(claimant.Email))
         {
@@ -83,6 +83,7 @@ public class PayClaimHandler
                 claim.Status.ToString(),
                 disburser.FullName,
                 approvalRecord.Notes,
+                claim.Id,
                 ct);
         }
 

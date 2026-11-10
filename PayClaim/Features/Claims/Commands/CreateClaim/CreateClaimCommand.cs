@@ -9,19 +9,22 @@ using PayClaim.Enums;
 
 namespace PayClaim.Features.Claims.Commands.CreateClaim;
 
-//public record CreateClaimCommand(CreateClaimDto Request, Guid? SubmitterEmployeeId = null);
-public record CreateClaimCommand( CreateClaimDto Request, Guid SubmitterEmployeeId);
+public record CreateClaimCommand(CreateClaimDto Request, Guid SubmitterEmployeeId);
 
-public class CreateClaimHandler(IUnitOfWork uow, PayClaimDbContext context, IFileStorageService fileStorage)
+public class CreateClaimHandler(
+    IUnitOfWork uow,
+    PayClaimDbContext context,
+    IFileStorageService fileStorage,
+    IEmailService emailService)
 {
-
     public async Task<ClaimDetailDto> Handle(CreateClaimCommand command, CancellationToken ct = default)
     {
         var request = command.Request;
 
-        // 1. Ambil Employee berdasarkan EmployeeId dari JWT
+        // 1. Ambil Employee beserta Manager dan Departemen berdasarkan EmployeeId dari JWT
         var employee = await context.Employees
             .Include(e => e.Department)
+            .Include(e => e.Manager)
             .FirstOrDefaultAsync(
                 e => e.Id == command.SubmitterEmployeeId,
                 ct);
@@ -192,7 +195,24 @@ public class CreateClaimHandler(IUnitOfWork uow, PayClaimDbContext context, IFil
 
         await uow.SaveChangesAsync(ct);
 
-        // 5. Buat Response
+        // 5. Kirim notifikasi email ke Atasan Langsung (Manager) jika ada
+        if (employee.Manager != null && !string.IsNullOrWhiteSpace(employee.Manager.Email))
+        {
+            await emailService.SendClaimSubmittedToManagerEmailAsync(
+                employee.Manager.Email,
+                employee.Manager.FullName,
+                employee.FullName,
+                employee.Number,
+                employee.Department?.Name ?? "-",
+                claim.ClaimType.ToString(),
+                claim.Description,
+                claim.Amount,
+                claim.SubmittedAt,
+                claim.Id,
+                ct);
+        }
+
+        // 6. Buat Response
         return new ClaimDetailDto
         {
             Id = claim.Id,
@@ -218,4 +238,3 @@ public class CreateClaimHandler(IUnitOfWork uow, PayClaimDbContext context, IFil
         };
     }
 }
-

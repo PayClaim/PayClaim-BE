@@ -22,6 +22,33 @@ public interface IEmailService
         string newStatus,
         string? approverName,
         string? notes,
+        Guid? claimId = null,
+        CancellationToken ct = default);
+
+    Task SendClaimSubmittedToManagerEmailAsync(
+        string toEmail,
+        string managerName,
+        string employeeName,
+        string employeeNumber,
+        string departmentName,
+        string claimType,
+        string claimDescription,
+        decimal amount,
+        DateTime submissionDate,
+        Guid claimId,
+        CancellationToken ct = default);
+
+    Task SendClaimApprovedToFinanceEmailAsync(
+        string toEmail,
+        string financeName,
+        string employeeName,
+        string departmentName,
+        string claimType,
+        string claimDescription,
+        decimal amount,
+        string managerName,
+        string? notes,
+        Guid claimId,
         CancellationToken ct = default);
 
     Task SendTripProposalStatusEmailAsync(

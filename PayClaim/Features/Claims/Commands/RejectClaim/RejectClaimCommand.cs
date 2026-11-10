@@ -185,6 +185,7 @@ public class RejectClaimHandler
                 claim.Status.ToString(),
                 approver.FullName,
                 command.Request.Notes,
+                claim.Id,
                 ct);
         }
 

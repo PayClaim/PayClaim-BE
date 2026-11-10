@@ -60,7 +60,11 @@ public class ClaimsController(
                 StatusCodes.Status401Unauthorized));
         }
 
-        var result = await createHandler.Handle(new CreateClaimCommand(request, employeeId.Value), ct);
+        var roles = GetLoggedInRoles();
+
+        var result = await createHandler.Handle(
+            new CreateClaimCommand(request, employeeId.Value, roles),
+            ct);
 
         return StatusCode(StatusCodes.Status201Created, ApiResponse<ClaimDetailDto>.Created(result, "Claim submitted successfully."));
     }

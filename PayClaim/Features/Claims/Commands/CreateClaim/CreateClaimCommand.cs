@@ -1,5 +1,7 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
@@ -9,16 +11,30 @@ using PayClaim.Enums;
 
 namespace PayClaim.Features.Claims.Commands.CreateClaim;
 
-public record CreateClaimCommand(CreateClaimDto Request, Guid SubmitterEmployeeId);
+public record CreateClaimCommand(
+    CreateClaimDto Request,
+    Guid? SubmitterEmployeeId = null,
+    IReadOnlyCollection<string>? Roles = null) : IRequest<ClaimDetailDto>;
 
 public class CreateClaimHandler(
     IUnitOfWork uow,
     PayClaimDbContext context,
     IFileStorageService fileStorage,
-    IEmailService emailService)
+    IEmailService emailService,
+    ICurrentUser currentUser) : IRequestHandler<CreateClaimCommand, ClaimDetailDto>
 {
     public async Task<ClaimDetailDto> Handle(CreateClaimCommand command, CancellationToken ct = default)
     {
+        var submitterId = command.SubmitterEmployeeId ?? currentUser.RequiredEmployeeId;
+        var roles = command.Roles ?? currentUser.Roles;
+
+        // 0. Cegah role Admin membuat claim reimbursement
+        if (roles.Contains("Admin", StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ForbiddenException(
+                "Akun Administrator tidak diperbolehkan mengajukan klaim reimbursement.");
+        }
+
         var request = command.Request;
 
         // 1. Ambil Employee beserta Manager dan Departemen berdasarkan EmployeeId dari JWT
@@ -26,7 +42,7 @@ public class CreateClaimHandler(
             .Include(e => e.Department)
             .Include(e => e.Manager)
             .FirstOrDefaultAsync(
-                e => e.Id == command.SubmitterEmployeeId,
+                e => e.Id == submitterId,
                 ct);
 
         if (employee == null)

@@ -60,32 +60,29 @@ public class GetTripProposalsHandler(PayClaimDbContext context, ICurrentUser cur
 
                 ||
 
-                // Manager hanya melihat proposal dari direct report
-                // yang sedang menunggu approval Manager.
+                // Manager melihat proposal dari direct report (PIC)
+                // atau yang pernah diapprove oleh Manager ini
                 (
                     isManager &&
-                    tp.Status == TripProposalStatus.Submitted &&
-                    tp.Participants.Any(p =>
-                        p.IsPic &&
-                        p.Employee.ManagerId == currentEmpId)
+                    (
+                        tp.Participants.Any(p =>
+                            p.IsPic &&
+                            p.Employee.ManagerId == currentEmpId)
+                        ||
+                        context.TripApprovals.Any(ta =>
+                            ta.TripProposalId == tp.Id &&
+                            ta.ApproverId == currentEmpId)
+                    )
                 )
 
                 ||
 
-                // Finance melihat proposal yang menunggu Finance.
-                (
-                    isFinance &&
-                    tp.Status == TripProposalStatus.UnderReview
-                )
+                // Finance dan Finance Manager melihat proposal
+                isFinance
 
                 ||
 
-                // Finance Manager melihat proposal yang menunggu
-                // Finance Manager.
-                (
-                    isFinanceManager &&
-                    tp.Status == TripProposalStatus.FinanceManagerReview
-                )
+                isFinanceManager
             );
         }
 
@@ -154,8 +151,8 @@ public class GetTripProposalsHandler(PayClaimDbContext context, ICurrentUser cur
 
         return new PagedResponse<TripProposalListDto>(
             items,
+            totalCount,
             filter.PageNumber,
-            filter.PageSize,
-            totalCount);
+            filter.PageSize);
     }
 }

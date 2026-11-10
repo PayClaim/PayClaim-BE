@@ -146,8 +146,8 @@ public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUse
 
         return new PagedResponse<ClaimListDto>(
             items,
+            totalCount,
             filter.PageNumber,
-            filter.PageSize,
-            totalCount);
+            filter.PageSize);
     }
 }

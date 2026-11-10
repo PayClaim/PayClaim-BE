@@ -69,22 +69,21 @@ public class GetTripProposalByIdHandler(PayClaimDbContext context, ICurrentUser 
 
         bool isDirectManager =
             isManager &&
-            accessInfo.Status == TripProposalStatus.Submitted &&
             accessInfo.PicManagerId == currentEmpId;
 
-        bool isFinanceReviewer =
-            isFinance &&
-            accessInfo.Status == TripProposalStatus.UnderReview;
+        bool hasApproved = await context.TripApprovals
+            .AsNoTracking()
+            .AnyAsync(ta => ta.TripProposalId == query.Id && ta.ApproverId == currentEmpId, ct);
 
-        bool isFinanceManagerReviewer =
-            isFinanceManager &&
-            accessInfo.Status == TripProposalStatus.FinanceManagerReview;
+        bool hasAccess =
+            isAdmin ||
+            accessInfo.IsParticipant ||
+            isDirectManager ||
+            hasApproved ||
+            isFinance ||
+            isFinanceManager;
 
-        if (!isAdmin &&
-            !accessInfo.IsParticipant &&
-            !isDirectManager &&
-            !isFinanceReviewer &&
-            !isFinanceManagerReviewer)
+        if (!hasAccess)
         {
             throw new ForbiddenException(
                 "You are not allowed to access this trip proposal.");

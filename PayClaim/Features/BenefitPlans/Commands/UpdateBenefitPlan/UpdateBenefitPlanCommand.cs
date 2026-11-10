@@ -2,6 +2,7 @@ using MediatR;
 using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
+using PayClaim.Entities;
 
 namespace PayClaim.Features.BenefitPlans.Commands;
 
@@ -30,6 +31,9 @@ public class UpdateBenefitPlanHandler(IUnitOfWork uow) : IRequestHandler<UpdateB
 
         var request = command.Request;
 
+        if (string.Equals(request.DepartmentId, "ALL", StringComparison.OrdinalIgnoreCase))
+            throw new BusinessRuleException("Cannot update a single benefit plan with DepartmentId 'ALL'.");
+
         // Validate Department
         var department = await uow.Departments.GetByIdAsync(
             new object[] { request.DepartmentId }, ct);
@@ -54,29 +58,46 @@ public class UpdateBenefitPlanHandler(IUnitOfWork uow) : IRequestHandler<UpdateB
         if (request.LimitAmount < 0)
             throw new BusinessRuleException("Limit amount cannot be negative.");
 
-        // Check whether the new combination already exists
-        var existingPlan = await uow.BenefitPlans.GetByIdAsync(
-            new object[]
-            {
-                request.DepartmentId,
-                request.BenefitId,
-                request.PositionId
-            }, ct);
+        bool keyChanged =
+            !string.Equals(request.DepartmentId, command.DepartmentId, StringComparison.Ordinal) ||
+            request.BenefitId != command.BenefitId ||
+            !string.Equals(request.PositionId, command.PositionId, StringComparison.Ordinal);
 
-        if (existingPlan != null &&
-            (request.DepartmentId != command.DepartmentId ||
-             request.BenefitId != command.BenefitId ||
-             request.PositionId != command.PositionId))
+        if (!keyChanged)
         {
-            throw new ConflictException("Benefit plan already exists.");
+            benefitPlan.LimitAmount = request.LimitAmount;
+            uow.BenefitPlans.Update(benefitPlan);
         }
+        else
+        {
+            // Check whether the new composite key combination already exists
+            var existingPlan = await uow.BenefitPlans.GetByIdAsync(
+                new object[]
+                {
+                    request.DepartmentId,
+                    request.BenefitId,
+                    request.PositionId
+                }, ct);
 
-        benefitPlan.DepartmentId = request.DepartmentId;
-        benefitPlan.BenefitId = request.BenefitId;
-        benefitPlan.PositionId = request.PositionId;
-        benefitPlan.LimitAmount = request.LimitAmount;
+            if (existingPlan != null)
+            {
+                throw new ConflictException("Benefit plan already exists.");
+            }
 
-        uow.BenefitPlans.Update(benefitPlan);
+            // EF Core does not allow modifying composite primary key properties on a tracked entity.
+            // Delete the existing record and insert a new one with the updated composite key.
+            uow.BenefitPlans.Delete(benefitPlan);
+
+            var newBenefitPlan = new BenefitPlan
+            {
+                DepartmentId = request.DepartmentId,
+                BenefitId = request.BenefitId,
+                PositionId = request.PositionId,
+                LimitAmount = request.LimitAmount
+            };
+
+            await uow.BenefitPlans.AddAsync(newBenefitPlan, ct);
+        }
 
         await uow.SaveChangesAsync(ct);
     }

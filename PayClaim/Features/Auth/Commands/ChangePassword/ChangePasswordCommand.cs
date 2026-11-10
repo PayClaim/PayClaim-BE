@@ -1,19 +1,22 @@
 using BCrypt.Net;
+using MediatR;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Auth;
 
 namespace PayClaim.Features.Auth.Commands.ChangePassword;
 
-public record ChangePasswordCommand(Guid AccountId, ChangePasswordRequestDto Request);
+public record ChangePasswordCommand(ChangePasswordRequestDto Request, Guid? AccountId = null) : IRequest;
 
-public class ChangePasswordHandler(IUnitOfWork uow)
+public class ChangePasswordHandler(IUnitOfWork uow, ICurrentUser currentUser) : IRequestHandler<ChangePasswordCommand>
 {
     public async Task Handle(ChangePasswordCommand command, CancellationToken ct = default)
     {
+        var targetAccountId = command.AccountId ?? currentUser.RequiredAccountId;
         var request = command.Request;
 
-        var account = await uow.Accounts.GetByIdAsync(new object[] { command.AccountId }, ct);
+        var account = await uow.Accounts.GetByIdAsync(new object[] { targetAccountId }, ct);
         if (account == null)
         {
             throw new NotFoundException("Account not found.");

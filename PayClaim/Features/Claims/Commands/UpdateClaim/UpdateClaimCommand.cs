@@ -1,5 +1,7 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
@@ -9,25 +11,20 @@ using PayClaim.Enums;
 
 namespace PayClaim.Features.Claims.Commands.UpdateClaim;
 
-public record UpdateClaimCommand(Guid ClaimId, CreateClaimDto Request, Guid? SubmitterEmployeeId = null);
+public record UpdateClaimCommand(Guid ClaimId, CreateClaimDto Request, Guid? SubmitterEmployeeId = null) : IRequest<ClaimDetailDto>;
 
-public class UpdateClaimHandler
+public class UpdateClaimHandler(
+    IUnitOfWork uow,
+    PayClaimDbContext context,
+    IFileStorageService fileStorage,
+    ICurrentUser currentUser) : IRequestHandler<UpdateClaimCommand, ClaimDetailDto>
 {
-    private readonly IUnitOfWork _uow;
-    private readonly PayClaimDbContext _context;
-    private readonly IFileStorageService _fileStorage;
-
-    public UpdateClaimHandler(IUnitOfWork uow, PayClaimDbContext context, IFileStorageService fileStorage)
-    {
-        _uow = uow;
-        _context = context;
-        _fileStorage = fileStorage;
-    }
-
     public async Task<ClaimDetailDto> Handle(UpdateClaimCommand command, CancellationToken ct = default)
     {
+        var submitterId = command.SubmitterEmployeeId ?? currentUser.EmployeeId;
+
         // 1. Ambil data klaim yang akan diubah
-        var claim = await _context.Claims
+        var claim = await context.Claims
             .Include(c => c.Employee)
                 .ThenInclude(e => e.Department)
             .Include(c => c.EmployeeBenefit)
@@ -48,7 +45,7 @@ public class UpdateClaimHandler
         }
 
         // 3. Validasi kepemilikan (jika ada SubmitterEmployeeId dari token login)
-        if (command.SubmitterEmployeeId.HasValue && claim.EmployeeId != command.SubmitterEmployeeId.Value)
+        if (submitterId.HasValue && claim.EmployeeId != submitterId.Value)
         {
             throw new BusinessRuleException("You are not authorized to modify a claim submitted by another employee.");
         }
@@ -66,7 +63,7 @@ public class UpdateClaimHandler
                     throw new BusinessRuleException("EmployeeBenefitId is required for Benefit claims.");
                 }
 
-                var empBenefit = await _context.EmployeeBenefits
+                var empBenefit = await context.EmployeeBenefits
                     .Include(eb => eb.Benefit)
                     .FirstOrDefaultAsync(eb => eb.Id == benefitId.Value, ct);
 
@@ -104,7 +101,7 @@ public class UpdateClaimHandler
                     throw new BusinessRuleException("TripProposalId is required for Business Trip Reimbursement claims.");
                 }
 
-                var trip = await _context.TripProposals
+                var trip = await context.TripProposals
                     .Include(tp => tp.Participants)
                     .FirstOrDefaultAsync(tp => tp.Id == tripId.Value, ct);
 
@@ -125,7 +122,7 @@ public class UpdateClaimHandler
                     throw new BusinessRuleException("This employee is not registered as a participant in the specified business trip proposal.");
                 }
 
-                var existingClaimedAmount = await _context.Claims
+                var existingClaimedAmount = await context.Claims
                     .Where(c => c.TripProposalId == trip.Id &&
                                 c.EmployeeId == claim.EmployeeId &&
                                 c.Id != claim.Id &&
@@ -155,7 +152,7 @@ public class UpdateClaimHandler
         // 5. Perbarui berkas kuitansi / nota jika ada file baru yang diunggah
         if (request.ReceiptFile != null && request.ReceiptFile.Length > 0)
         {
-            claim.FilePath = await _fileStorage.SaveFileAsync(request.ReceiptFile, "receipts", ct);
+            claim.FilePath = await fileStorage.SaveFileAsync(request.ReceiptFile, "receipts", ct);
         }
 
         // 6. Update properti klaim & kembalikan status ke Submitted (Resubmitted)
@@ -166,11 +163,11 @@ public class UpdateClaimHandler
         claim.Status = ClaimStatus.Submitted;
         claim.SubmittedAt = DateTime.UtcNow;
 
-        _uow.Claims.Update(claim);
-        await _uow.SaveChangesAsync(ct);
+        uow.Claims.Update(claim);
+        await uow.SaveChangesAsync(ct);
 
         // 7. Ambil riwayat approval untuk detail DTO
-        var approvalHistory = await _context.ClaimApprovals
+        var approvalHistory = await context.ClaimApprovals
             .AsNoTracking()
             .Where(ca => ca.ClaimId == claim.Id)
             .OrderBy(ca => ca.ApprovalLevel)

@@ -1,12 +1,13 @@
-﻿using Microsoft.EntityFrameworkCore;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
 using PayClaim.Data;
 using PayClaim.DTOs.Master;
 
 namespace PayClaim.Features.BenefitCategories.Queries.GetBenefitCategories;
 
-public record GetBenefitCategoriesQuery;
+public record GetBenefitCategoriesQuery : IRequest<IReadOnlyCollection<BenefitCategoryDto>>;
 
-public class GetBenefitCategoriesHandler(PayClaimDbContext db)
+public class GetBenefitCategoriesHandler(PayClaimDbContext db) : IRequestHandler<GetBenefitCategoriesQuery, IReadOnlyCollection<BenefitCategoryDto>>
 {
     public async Task<IReadOnlyCollection<BenefitCategoryDto>> Handle(
         GetBenefitCategoriesQuery query,

@@ -1,11 +1,13 @@
-﻿using PayClaim.Common.Exceptions;
+using MediatR;
+using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
+
 namespace PayClaim.Features.Departments.Commands.UpdataDepartment;
 
-public record UpdateDepartmentCommand(string Id, UpdateDepartmentDto Request);
+public record UpdateDepartmentCommand(string Id, UpdateDepartmentDto Request) : IRequest;
 
-public class UpdateDepartmentHandler(IUnitOfWork uow)
+public class UpdateDepartmentHandler(IUnitOfWork uow) : IRequestHandler<UpdateDepartmentCommand>
 {
     public async Task Handle(UpdateDepartmentCommand command, CancellationToken ct)
     {
@@ -42,4 +44,3 @@ public class UpdateDepartmentHandler(IUnitOfWork uow)
         await uow.SaveChangesAsync(ct);
     }
 }
-

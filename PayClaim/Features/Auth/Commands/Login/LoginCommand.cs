@@ -1,4 +1,5 @@
 using BCrypt.Net;
+using MediatR;
 using PayClaim.Common.Exceptions;
 using PayClaim.Common.Security;
 using PayClaim.Data.UnitOfWork;
@@ -6,37 +7,18 @@ using PayClaim.DTOs.Auth;
 
 namespace PayClaim.Features.Auth.Commands.Login;
 
-public class LoginCommand
+public record LoginCommand(LoginRequestDto Request) : IRequest<LoginResponseDto>;
+
+public class LoginHandler(
+    IUnitOfWork unitOfWork,
+    IJwtTokenService jwtTokenService,
+    IConfiguration configuration) : IRequestHandler<LoginCommand, LoginResponseDto>
 {
-    public LoginRequestDto Request { get; set; }
-
-    public LoginCommand(LoginRequestDto request)
-    {
-        Request = request;
-    }
-}
-
-public class LoginHandler
-{
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IJwtTokenService _jwtTokenService;
-    private readonly IConfiguration _configuration;
-
-    public LoginHandler(
-        IUnitOfWork unitOfWork,
-        IJwtTokenService jwtTokenService,
-        IConfiguration configuration)
-    {
-        _unitOfWork = unitOfWork;
-        _jwtTokenService = jwtTokenService;
-        _configuration = configuration;
-    }
-
     public async Task<LoginResponseDto> Handle(LoginCommand command, CancellationToken ct = default)
     {
         var request = command.Request;
 
-        var account = await _unitOfWork.Accounts.GetByUsernameWithDetailsAsync(request.Username, ct);
+        var account = await unitOfWork.Accounts.GetByUsernameWithDetailsAsync(request.Username, ct);
 
         if (account == null)
         {
@@ -54,9 +36,9 @@ public class LoginHandler
             throw new BusinessRuleException("Invalid username or password.");
         }
 
-        var token = _jwtTokenService.GenerateToken(account);
+        var token = jwtTokenService.GenerateToken(account);
 
-        var expiryDays = double.TryParse(_configuration["Jwt:ExpiryDays"], out var days) ? days : 1;
+        var expiryDays = double.TryParse(configuration["Jwt:ExpiryDays"], out var days) ? days : 1;
         var expiresAt = DateTime.UtcNow.AddDays(expiryDays);
 
         var userProfile = new UserProfileResponseDto

@@ -1,5 +1,7 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
@@ -12,31 +14,24 @@ namespace PayClaim.Features.Claims.Commands.RejectClaim;
 public record RejectClaimCommand(
     Guid ClaimId,
     ClaimApprovalActionDto Request,
-    Guid LoggedInApproverId,
-    IReadOnlyCollection<string> ApproverRoles);
+    Guid? LoggedInApproverId = null,
+    IReadOnlyCollection<string>? ApproverRoles = null) : IRequest<ClaimApprovalHistoryDto>;
 
-public class RejectClaimHandler
+public class RejectClaimHandler(
+    IUnitOfWork uow,
+    PayClaimDbContext context,
+    IEmailService emailService,
+    ICurrentUser currentUser) : IRequestHandler<RejectClaimCommand, ClaimApprovalHistoryDto>
 {
-    private readonly IUnitOfWork _uow;
-    private readonly PayClaimDbContext _context;
-    private readonly IEmailService _emailService;
-
-    public RejectClaimHandler(
-        IUnitOfWork uow,
-        PayClaimDbContext context,
-        IEmailService emailService)
-    {
-        _uow = uow;
-        _context = context;
-        _emailService = emailService;
-    }
-
     public async Task<ClaimApprovalHistoryDto> Handle(
         RejectClaimCommand command,
         CancellationToken ct = default)
     {
+        var approverId = command.LoggedInApproverId ?? currentUser.RequiredEmployeeId;
+        var approverRoles = command.ApproverRoles ?? currentUser.Roles;
+
         // 1. Ambil Claim.
-        var claim = await _uow.Claims.GetByIdAsync(
+        var claim = await uow.Claims.GetByIdAsync(
             new object[] { command.ClaimId },
             ct);
 
@@ -80,12 +75,12 @@ public class RejectClaimHandler
         };
 
         // 4. Pastikan approver memiliki role yang sesuai.
-        bool isAdmin = command.ApproverRoles.Contains("Admin", StringComparer.OrdinalIgnoreCase);
-        bool isFinanceManager = command.ApproverRoles.Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
+        bool isAdmin = approverRoles.Contains("Admin", StringComparer.OrdinalIgnoreCase);
+        bool isFinanceManager = approverRoles.Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
 
         bool hasRequiredRole = isAdmin || (currentLevel == 1
-            ? (command.ApproverRoles.Contains("Manager", StringComparer.OrdinalIgnoreCase) || isFinanceManager)
-            : (command.ApproverRoles.Contains("Finance", StringComparer.OrdinalIgnoreCase) || isFinanceManager));
+            ? (approverRoles.Contains("Manager", StringComparer.OrdinalIgnoreCase) || isFinanceManager)
+            : (approverRoles.Contains("Finance", StringComparer.OrdinalIgnoreCase) || isFinanceManager));
 
         if (!hasRequiredRole)
         {
@@ -94,10 +89,10 @@ public class RejectClaimHandler
         }
 
         // 5. Ambil Employee yang sedang login berdasarkan JWT.
-        var approver = await _context.Employees
+        var approver = await context.Employees
             .AsNoTracking()
             .FirstOrDefaultAsync(
-                e => e.Id == command.LoggedInApproverId,
+                e => e.Id == approverId,
                 ct);
 
         if (approver == null)
@@ -122,7 +117,7 @@ public class RejectClaimHandler
         // 7. Jika Level 1 (Manager), pastikan dia atasan langsung pengaju Claim atau Admin.
         if (currentLevel == 1 && !isAdmin)
         {
-            var claimant = await _context.Employees
+            var claimant = await context.Employees
                 .AsNoTracking()
                 .FirstOrDefaultAsync(e => e.Id == claim.EmployeeId, ct);
 
@@ -149,7 +144,7 @@ public class RejectClaimHandler
             ? ClaimStatus.NeedsRevision
             : ClaimStatus.Rejected;
 
-        _uow.Claims.Update(claim);
+        uow.Claims.Update(claim);
 
         // 9. Buat riwayat approval.
         var approvalRecord = new ClaimApproval
@@ -163,21 +158,21 @@ public class RejectClaimHandler
             DecidedAt = DateTime.UtcNow
         };
 
-        await _uow.ClaimApprovals.AddAsync(
+        await uow.ClaimApprovals.AddAsync(
             approvalRecord,
             ct);
 
         // 10. Simpan perubahan ke database.
-        await _uow.SaveChangesAsync(ct);
+        await uow.SaveChangesAsync(ct);
 
         // 11. Kirim notifikasi email penolakan / revisi ke karyawan.
-        var claimantEmp = await _uow.Employees.GetByIdAsync(
+        var claimantEmp = await uow.Employees.GetByIdAsync(
             new object[] { claim.EmployeeId },
             ct);
 
         if (claimantEmp != null && !string.IsNullOrWhiteSpace(claimantEmp.Email))
         {
-            await _emailService.SendClaimStatusEmailAsync(
+            await emailService.SendClaimStatusEmailAsync(
                 claimantEmp.Email,
                 claimantEmp.FullName,
                 claim.Description,

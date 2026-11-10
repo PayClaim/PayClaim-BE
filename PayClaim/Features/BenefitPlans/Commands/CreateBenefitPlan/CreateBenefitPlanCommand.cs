@@ -1,3 +1,4 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
 using PayClaim.Data;
@@ -8,9 +9,9 @@ using PayClaim.Enums;
 
 namespace PayClaim.Features.BenefitPlans.Commands;
 
-public record CreateBenefitPlanCommand(UpsertBenefitPlanDto Request);
+public record CreateBenefitPlanCommand(UpsertBenefitPlanDto Request) : IRequest;
 
-public class CreateBenefitPlanHandler(IUnitOfWork uow, PayClaimDbContext db)
+public class CreateBenefitPlanHandler(IUnitOfWork uow, PayClaimDbContext db) : IRequestHandler<CreateBenefitPlanCommand>
 {
     public async Task Handle(CreateBenefitPlanCommand command, CancellationToken ct)
     {

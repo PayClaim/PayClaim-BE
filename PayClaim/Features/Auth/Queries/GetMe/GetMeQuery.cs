@@ -1,49 +1,38 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Data;
 using PayClaim.DTOs.Auth;
 
 namespace PayClaim.Features.Auth.Queries.GetMe;
 
-public class GetMeQuery
+public record GetMeQuery(Guid? AccountId = null) : IRequest<UserProfileResponseDto>;
+
+public class GetMeHandler(PayClaimDbContext context, ICurrentUser currentUser) : IRequestHandler<GetMeQuery, UserProfileResponseDto>
 {
-    public Guid AccountId { get; set; }
-
-    public GetMeQuery(Guid accountId)
-    {
-        AccountId = accountId;
-    }
-}
-
-public class GetMeHandler
-{
-    private readonly PayClaimDbContext _context;
-
-    public GetMeHandler(PayClaimDbContext context)
-    {
-        _context = context;
-    }
-
     public async Task<UserProfileResponseDto> Handle(GetMeQuery query, CancellationToken ct = default)
     {
-        var userProfile = await _context.Accounts
+        var targetAccountId = query.AccountId ?? currentUser.RequiredAccountId;
+
+        var userProfile = await context.Accounts
             .AsNoTracking()
-            .Where(a => a.Id == query.AccountId && a.IsActive)
+            .Where(a => a.Id == targetAccountId && a.IsActive)
             .Select(a => new UserProfileResponseDto
             {
                 AccountId = a.Id,
                 EmployeeId = a.EmployeeId,
-                EmployeeNumber = a.Employee.Number,
+                EmployeeNumber = a.Employee != null ? a.Employee.Number : string.Empty,
                 Username = a.Username,
-                FullName = a.Employee.FullName,
-                Email = a.Employee.Email,
-                DepartmentId = a.Employee.DepartmentId,
-                DepartmentName = a.Employee.Department.Name,
-                PositionId = a.Employee.PositionId,
-                PositionTitle = a.Employee.Position.Title,
-                ManagerId = a.Employee.ManagerId,
-                ManagerName = a.Employee.Manager != null ? a.Employee.Manager.FullName : null,
-                Roles = a.AccountRoles.Select(ar => ar.Role.Name).ToList()
+                FullName = a.Employee != null ? a.Employee.FullName : string.Empty,
+                Email = a.Employee != null ? a.Employee.Email : string.Empty,
+                DepartmentId = a.Employee != null ? a.Employee.DepartmentId : string.Empty,
+                DepartmentName = a.Employee != null && a.Employee.Department != null ? a.Employee.Department.Name : null,
+                PositionId = a.Employee != null ? a.Employee.PositionId : string.Empty,
+                PositionTitle = a.Employee != null && a.Employee.Position != null ? a.Employee.Position.Title : null,
+                ManagerId = a.Employee != null ? a.Employee.ManagerId : null,
+                ManagerName = a.Employee != null && a.Employee.Manager != null ? a.Employee.Manager.FullName : null,
+                Roles = a.AccountRoles.Where(ar => ar.Role != null).Select(ar => ar.Role.Name).ToList()
             })
             .FirstOrDefaultAsync(ct);
 

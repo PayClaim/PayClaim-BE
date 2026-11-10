@@ -1,4 +1,4 @@
-using System.Security.Claims;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Auth;
@@ -12,17 +12,13 @@ namespace PayClaim.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController(
-    LoginHandler loginHandler,
-    GetMeHandler getMeHandler,
-    ChangePasswordHandler changePasswordHandler,
-    ResetPasswordHandler resetPasswordHandler) : ControllerBase
+public class AuthController(ISender sender) : ControllerBase
 {
     [HttpPost("login")]
     [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto request, CancellationToken ct)
     {
-        var result = await loginHandler.Handle(new LoginCommand(request), ct);
+        var result = await sender.Send(new LoginCommand(request), ct);
         return Ok(ApiResponse<LoginResponseDto>.Ok(result, "Login successful."));
     }
 
@@ -30,16 +26,7 @@ public class AuthController(
     [Authorize]
     public async Task<ActionResult<UserProfileResponseDto>> GetMe(CancellationToken ct)
     {
-        var accountIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) 
-            ?? User.FindFirstValue("AccountId")
-            ?? User.FindFirst("sub")?.Value;
-
-        if (string.IsNullOrEmpty(accountIdClaim) || !Guid.TryParse(accountIdClaim, out var accountId))
-        {
-            return Unauthorized(ApiResponse.Fail("Invalid or missing user identity in token.", StatusCodes.Status401Unauthorized));
-        }
-
-        var profile = await getMeHandler.Handle(new GetMeQuery(accountId), ct);
+        var profile = await sender.Send(new GetMeQuery(), ct);
         return Ok(profile);
     }
 
@@ -47,16 +34,7 @@ public class AuthController(
     [Authorize]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequestDto request, CancellationToken ct)
     {
-        var accountIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) 
-            ?? User.FindFirstValue("AccountId")
-            ?? User.FindFirst("sub")?.Value;
-
-        if (string.IsNullOrEmpty(accountIdClaim) || !Guid.TryParse(accountIdClaim, out var accountId))
-        {
-            return Unauthorized(ApiResponse.Fail("Invalid or missing user identity in token.", StatusCodes.Status401Unauthorized));
-        }
-
-        await changePasswordHandler.Handle(new ChangePasswordCommand(accountId, request), ct);
+        await sender.Send(new ChangePasswordCommand(request), ct);
         return Ok(ApiResponse.Ok("Password changed successfully."));
     }
 
@@ -64,7 +42,7 @@ public class AuthController(
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequestDto request, CancellationToken ct)
     {
-        await resetPasswordHandler.Handle(new ResetPasswordCommand(request), ct);
+        await sender.Send(new ResetPasswordCommand(request), ct);
         return Ok(ApiResponse.Ok("Password has been reset successfully."));
     }
 }

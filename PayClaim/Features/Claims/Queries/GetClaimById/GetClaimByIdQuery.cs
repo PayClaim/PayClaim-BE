@@ -1,5 +1,7 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Data;
 using PayClaim.DTOs.Claim;
 
@@ -7,21 +9,14 @@ namespace PayClaim.Features.Claims.Queries.GetClaimById;
 
 public record GetClaimByIdQuery(
     Guid Id,
-    Guid? RequesterEmployeeId,
-    IReadOnlyCollection<string> RequesterRoles);
+    Guid? RequesterEmployeeId = null,
+    IReadOnlyCollection<string>? RequesterRoles = null) : IRequest<ClaimDetailDto>;
 
-public class GetClaimByIdHandler
+public class GetClaimByIdHandler(PayClaimDbContext context, ICurrentUser currentUser) : IRequestHandler<GetClaimByIdQuery, ClaimDetailDto>
 {
-    private readonly PayClaimDbContext _context;
-
-    public GetClaimByIdHandler(PayClaimDbContext context)
-    {
-        _context = context;
-    }
-
     public async Task<ClaimDetailDto> Handle(GetClaimByIdQuery query, CancellationToken ct = default)
     {
-        var claimAccess = await _context.Claims
+        var claimAccess = await context.Claims
             .AsNoTracking()
             .Where(c => c.Id == query.Id)
             .Select(c => new
@@ -36,24 +31,24 @@ public class GetClaimByIdHandler
             throw new NotFoundException(
                 $"Claim with ID '{query.Id}' was not found.");
         }
-        var isAdmin = query.RequesterRoles
-            .Contains("Admin", StringComparer.OrdinalIgnoreCase);
 
-        var isFinance = query.RequesterRoles
-            .Contains("Finance", StringComparer.OrdinalIgnoreCase) ||
-            query.RequesterRoles
-            .Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
+        var roles = query.RequesterRoles ?? currentUser.Roles;
+        var employeeId = query.RequesterEmployeeId ?? currentUser.EmployeeId;
 
-        var isManager = query.RequesterRoles
-            .Contains("Manager", StringComparer.OrdinalIgnoreCase);
+        var isAdmin = roles.Contains("Admin", StringComparer.OrdinalIgnoreCase);
 
-        var isOwner = query.RequesterEmployeeId.HasValue &&
-            claimAccess.EmployeeId == query.RequesterEmployeeId.Value;
+        var isFinance = roles.Contains("Finance", StringComparer.OrdinalIgnoreCase) ||
+            roles.Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
+
+        var isManager = roles.Contains("Manager", StringComparer.OrdinalIgnoreCase);
+
+        var isOwner = employeeId.HasValue &&
+            claimAccess.EmployeeId == employeeId.Value;
 
         var isManagerOfOwner =
             isManager &&
-            query.RequesterEmployeeId.HasValue &&
-            claimAccess.ManagerId == query.RequesterEmployeeId.Value;
+            employeeId.HasValue &&
+            claimAccess.ManagerId == employeeId.Value;
 
         var hasAccess =
             isAdmin ||
@@ -66,7 +61,8 @@ public class GetClaimByIdHandler
             throw new ForbiddenException(
                 "You are not allowed to access this claim.");
         }
-        var claim = await _context.Claims
+
+        var claim = await context.Claims
             .AsNoTracking()
             .Where(c => c.Id == query.Id)
             .Select(c => new ClaimDetailDto
@@ -100,7 +96,7 @@ public class GetClaimByIdHandler
                 $"Claim with ID '{query.Id}' was not found.");
         }
 
-        var approvalHistory = await _context.ClaimApprovals
+        var approvalHistory = await context.ClaimApprovals
             .AsNoTracking()
             .Where(ca => ca.ClaimId == query.Id)
             .OrderBy(ca => ca.ApprovalLevel)

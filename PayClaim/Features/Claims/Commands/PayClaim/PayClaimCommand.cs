@@ -1,5 +1,7 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
@@ -9,24 +11,17 @@ using PayClaim.Enums;
 
 namespace PayClaim.Features.Claims.Commands.PayClaim;
 
-public record PayClaimCommand(Guid ClaimId, string? Notes = null, Guid? DisburserId = null);
+public record PayClaimCommand(Guid ClaimId, string? Notes = null, Guid? DisburserId = null) : IRequest<ClaimApprovalHistoryDto>;
 
-public class PayClaimHandler
+public class PayClaimHandler(
+    IUnitOfWork uow,
+    PayClaimDbContext context,
+    IEmailService emailService,
+    ICurrentUser currentUser) : IRequestHandler<PayClaimCommand, ClaimApprovalHistoryDto>
 {
-    private readonly IUnitOfWork _uow;
-    private readonly PayClaimDbContext _context;
-    private readonly IEmailService _emailService;
-
-    public PayClaimHandler(IUnitOfWork uow, PayClaimDbContext context, IEmailService emailService)
-    {
-        _uow = uow;
-        _context = context;
-        _emailService = emailService;
-    }
-
     public async Task<ClaimApprovalHistoryDto> Handle(PayClaimCommand command, CancellationToken ct = default)
     {
-        var claim = await _uow.Claims.GetByIdAsync(new object[] { command.ClaimId }, ct);
+        var claim = await uow.Claims.GetByIdAsync(new object[] { command.ClaimId }, ct);
         if (claim == null)
         {
             throw new NotFoundException($"Claim with ID '{command.ClaimId}' was not found.");
@@ -39,15 +34,16 @@ public class PayClaimHandler
         }
 
         Employee? disburser = null;
-        if (command.DisburserId.HasValue)
+        var disburserId = command.DisburserId ?? currentUser.EmployeeId;
+        if (disburserId.HasValue)
         {
-            disburser = await _uow.Employees.GetByIdAsync(new object[] { command.DisburserId.Value }, ct);
+            disburser = await uow.Employees.GetByIdAsync(new object[] { disburserId.Value }, ct);
         }
 
-        disburser ??= await _context.Employees
+        disburser ??= await context.Employees
             .Include(e => e.Position)
             .FirstOrDefaultAsync(e => e.Position.Title.Contains("Finance"), ct)
-            ?? await _context.Employees.FirstOrDefaultAsync(ct);
+            ?? await context.Employees.FirstOrDefaultAsync(ct);
 
         if (disburser == null)
         {
@@ -55,7 +51,7 @@ public class PayClaimHandler
         }
 
         claim.Status = ClaimStatus.Paid;
-        _uow.Claims.Update(claim);
+        uow.Claims.Update(claim);
 
         var approvalRecord = new ClaimApproval
         {
@@ -68,14 +64,14 @@ public class PayClaimHandler
             DecidedAt = DateTime.UtcNow
         };
 
-        await _uow.ClaimApprovals.AddAsync(approvalRecord, ct);
-        await _uow.SaveChangesAsync(ct);
+        await uow.ClaimApprovals.AddAsync(approvalRecord, ct);
+        await uow.SaveChangesAsync(ct);
 
         // 7. Kirim notifikasi email pencairan dana ke karyawan (payroll selanjutnya)
-        var claimant = await _uow.Employees.GetByIdAsync(new object[] { claim.EmployeeId }, ct);
+        var claimant = await uow.Employees.GetByIdAsync(new object[] { claim.EmployeeId }, ct);
         if (claimant != null && !string.IsNullOrWhiteSpace(claimant.Email))
         {
-            await _emailService.SendClaimStatusEmailAsync(
+            await emailService.SendClaimStatusEmailAsync(
                 claimant.Email,
                 claimant.FullName,
                 claim.Description,

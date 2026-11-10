@@ -1,5 +1,7 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
@@ -12,28 +14,24 @@ namespace PayClaim.Features.Claims.Commands.ApproveClaim;
 public record ApproveClaimCommand(
     Guid ClaimId,
     ClaimApprovalActionDto Request,
-    Guid LoggedInApproverId,
-    IReadOnlyCollection<string> ApproverRoles);
+    Guid? LoggedInApproverId = null,
+    IReadOnlyCollection<string>? ApproverRoles = null) : IRequest<ClaimApprovalHistoryDto>;
 
-public class ApproveClaimHandler
+public class ApproveClaimHandler(
+    IUnitOfWork uow,
+    PayClaimDbContext context,
+    IEmailService emailService,
+    ICurrentUser currentUser) : IRequestHandler<ApproveClaimCommand, ClaimApprovalHistoryDto>
 {
-    private readonly IUnitOfWork _uow;
-    private readonly PayClaimDbContext _context;
-    private readonly IEmailService _emailService;
-
-    public ApproveClaimHandler(IUnitOfWork uow, PayClaimDbContext context, IEmailService emailService)
-    {
-        _uow = uow;
-        _context = context;
-        _emailService = emailService;
-    }
-
     public async Task<ClaimApprovalHistoryDto> Handle(
         ApproveClaimCommand command,
         CancellationToken ct = default)
     {
+        var approverId = command.LoggedInApproverId ?? currentUser.RequiredEmployeeId;
+        var approverRoles = command.ApproverRoles ?? currentUser.Roles;
+
         // 1. Ambil Claim
-        var claim = await _uow.Claims.GetByIdAsync(
+        var claim = await uow.Claims.GetByIdAsync(
             new object[] { command.ClaimId },
             ct);
 
@@ -67,12 +65,12 @@ public class ApproveClaimHandler
         }
 
         // 3. Periksa apakah approver memiliki role yang sesuai
-        bool isAdmin = command.ApproverRoles.Contains("Admin", StringComparer.OrdinalIgnoreCase);
-        bool isFinanceManager = command.ApproverRoles.Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
+        bool isAdmin = approverRoles.Contains("Admin", StringComparer.OrdinalIgnoreCase);
+        bool isFinanceManager = approverRoles.Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
 
         bool hasRequiredRole = isAdmin || (currentLevel == 1
-            ? (command.ApproverRoles.Contains("Manager", StringComparer.OrdinalIgnoreCase) || isFinanceManager)
-            : (command.ApproverRoles.Contains("Finance", StringComparer.OrdinalIgnoreCase) || isFinanceManager));
+            ? (approverRoles.Contains("Manager", StringComparer.OrdinalIgnoreCase) || isFinanceManager)
+            : (approverRoles.Contains("Finance", StringComparer.OrdinalIgnoreCase) || isFinanceManager));
 
         if (!hasRequiredRole)
         {
@@ -81,9 +79,9 @@ public class ApproveClaimHandler
         }
 
         // 4. Ambil Employee yang sedang melakukan approval
-        var approver = await _context.Employees
+        var approver = await context.Employees
             .FirstOrDefaultAsync(
-                e => e.Id == command.LoggedInApproverId,
+                e => e.Id == approverId,
                 ct);
 
         if (approver == null)
@@ -107,7 +105,7 @@ public class ApproveClaimHandler
         // 5. Jika Level 1 (Manager), pastikan dia Manager dari pengaju Claim atau Admin
         if (currentLevel == 1 && !isAdmin)
         {
-            var claimant = await _context.Employees
+            var claimant = await context.Employees
                 .AsNoTracking()
                 .FirstOrDefaultAsync(e => e.Id == claim.EmployeeId, ct);
 
@@ -139,7 +137,7 @@ public class ApproveClaimHandler
                     "Benefit claim does not have an associated EmployeeBenefit quota.");
             }
 
-            var empBenefit = await _context.EmployeeBenefits
+            var empBenefit = await context.EmployeeBenefits
                 .FirstOrDefaultAsync(
                     eb => eb.Id == claim.EmployeeBenefitId.Value,
                     ct);
@@ -158,13 +156,13 @@ public class ApproveClaimHandler
 
             empBenefit.Balance -= claim.Amount;
 
-            _uow.EmployeeBenefits.Update(empBenefit);
+            uow.EmployeeBenefits.Update(empBenefit);
         }
 
         // 7. Update status Claim
         claim.Status = nextStatus;
 
-        _uow.Claims.Update(claim);
+        uow.Claims.Update(claim);
 
         // 8. Simpan riwayat approval
         var approvalRecord = new ClaimApproval
@@ -178,22 +176,22 @@ public class ApproveClaimHandler
             DecidedAt = DateTime.UtcNow
         };
 
-        await _uow.ClaimApprovals.AddAsync(
+        await uow.ClaimApprovals.AddAsync(
             approvalRecord,
             ct);
 
         // 9. Simpan seluruh perubahan
-        await _uow.SaveChangesAsync(ct);
+        await uow.SaveChangesAsync(ct);
 
         // 10. Ambil data pengaju klaim (claimant) untuk kirim email notifikasi
-        var claimantEmp = await _context.Employees
+        var claimantEmp = await context.Employees
             .Include(e => e.Department)
             .FirstOrDefaultAsync(e => e.Id == claim.EmployeeId, ct);
 
         // 11. Notifikasi ke bawahan/pengaju klaim mengenai perubahan status
         if (claimantEmp != null && !string.IsNullOrWhiteSpace(claimantEmp.Email))
         {
-            await _emailService.SendClaimStatusEmailAsync(
+            await emailService.SendClaimStatusEmailAsync(
                 claimantEmp.Email,
                 claimantEmp.FullName,
                 claim.Description,
@@ -208,7 +206,7 @@ public class ApproveClaimHandler
         // 12. Jika disetujui Manajer (Level 1 / status UnderReview), kirim notifikasi ke Tim Finance
         if (currentLevel == 1)
         {
-            var financeUsers = await _context.Accounts
+            var financeUsers = await context.Accounts
                 .Where(a => a.IsActive && a.AccountRoles.Any(ar => ar.Role.Name == "Finance" || ar.Role.Name == "Finance Manager"))
                 .Select(a => new { a.Employee.Email, a.Employee.FullName })
                 .Where(x => !string.IsNullOrEmpty(x.Email))
@@ -217,7 +215,7 @@ public class ApproveClaimHandler
 
             foreach (var fin in financeUsers)
             {
-                await _emailService.SendClaimApprovedToFinanceEmailAsync(
+                await emailService.SendClaimApprovedToFinanceEmailAsync(
                     fin.Email,
                     fin.FullName,
                     claimantEmp?.FullName ?? "Karyawan",

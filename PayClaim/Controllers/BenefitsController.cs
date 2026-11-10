@@ -1,3 +1,4 @@
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Master;
@@ -8,16 +9,13 @@ namespace PayClaim.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class BenefitsController(CreateBenefitHandler createHandler, GetBenefitsHandler getAllHandler, GetBenefitByIdHandler getByIdHandler,
-    UpdateBenefitHandler updateHandler, DeleteBenefitHandler deleteHandler) : ControllerBase
+public class BenefitsController(ISender sender) : ControllerBase
 {
     [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<ActionResult<List<BenefitDto>>> GetAll(CancellationToken ct)
     {
-        var result = await getAllHandler.Handle(
-            new GetBenefitsQuery(), ct);
-
+        var result = await sender.Send(new GetBenefitsQuery(), ct);
         return Ok(result);
     }
 
@@ -25,9 +23,7 @@ public class BenefitsController(CreateBenefitHandler createHandler, GetBenefitsH
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<BenefitDto>> GetById(Guid id, CancellationToken ct)
     {
-        var result = await getByIdHandler.Handle(
-            new GetBenefitByIdQuery(id), ct);
-
+        var result = await sender.Send(new GetBenefitByIdQuery(id), ct);
         return Ok(result);
     }
 
@@ -35,9 +31,7 @@ public class BenefitsController(CreateBenefitHandler createHandler, GetBenefitsH
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateBenefitDto request, CancellationToken ct)
     {
-        var id = await createHandler.Handle(
-            new CreateBenefitCommand(request), ct);
-
+        var id = await sender.Send(new CreateBenefitCommand(request), ct);
         return Created($"/api/benefits/{id}", new { id });
     }
 
@@ -45,9 +39,7 @@ public class BenefitsController(CreateBenefitHandler createHandler, GetBenefitsH
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateBenefitDto request, CancellationToken ct)
     {
-        await updateHandler.Handle(
-            new UpdateBenefitCommand(id, request), ct);
-
+        await sender.Send(new UpdateBenefitCommand(id, request), ct);
         return Ok(new { message = "Benefit updated successfully." });
     }
 
@@ -55,9 +47,7 @@ public class BenefitsController(CreateBenefitHandler createHandler, GetBenefitsH
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        await deleteHandler.Handle(
-            new DeleteBenefitCommand(id), ct);
-
+        await sender.Send(new DeleteBenefitCommand(id), ct);
         return Ok(new { message = "Benefit deleted successfully." });
     }
 }

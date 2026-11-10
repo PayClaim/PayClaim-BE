@@ -1,12 +1,13 @@
-﻿using Microsoft.EntityFrameworkCore;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
 using PayClaim.Data;
 using PayClaim.DTOs.Master;
 
 namespace PayClaim.Features.Positions.Queries.GetPositions;
 
-public record GetPositionsQuery;
+public record GetPositionsQuery : IRequest<IReadOnlyCollection<PositionDto>>;
 
-public class GetPositionsHandler(PayClaimDbContext db)
+public class GetPositionsHandler(PayClaimDbContext db) : IRequestHandler<GetPositionsQuery, IReadOnlyCollection<PositionDto>>
 {
     public async Task<IReadOnlyCollection<PositionDto>> Handle(
         GetPositionsQuery query,

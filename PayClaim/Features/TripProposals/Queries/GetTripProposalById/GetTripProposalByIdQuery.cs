@@ -1,5 +1,7 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Data;
 using PayClaim.DTOs.TripProposal;
 using PayClaim.Enums;
@@ -8,16 +10,17 @@ namespace PayClaim.Features.TripProposals.Queries.GetTripProposalById;
 
 public record GetTripProposalByIdQuery(
     Guid Id,
-    Guid? EmployeeId,
-    string[] Roles);
+    Guid? EmployeeId = null,
+    string[]? Roles = null) : IRequest<TripProposalDetailDto>;
 
-public class GetTripProposalByIdHandler(PayClaimDbContext context)
+public class GetTripProposalByIdHandler(PayClaimDbContext context, ICurrentUser currentUser) : IRequestHandler<GetTripProposalByIdQuery, TripProposalDetailDto>
 {
     public async Task<TripProposalDetailDto> Handle(
         GetTripProposalByIdQuery query,
         CancellationToken ct = default)
     {
-        var roles = query.Roles ?? Array.Empty<string>();
+        var roles = query.Roles ?? currentUser.Roles;
+        var employeeId = query.EmployeeId ?? currentUser.EmployeeId;
 
         bool isAdmin = roles.Contains(
             "Admin", StringComparer.OrdinalIgnoreCase);
@@ -32,14 +35,14 @@ public class GetTripProposalByIdHandler(PayClaimDbContext context)
             "Finance Manager", StringComparer.OrdinalIgnoreCase);
 
         if (!isAdmin &&
-            (!query.EmployeeId.HasValue ||
-             query.EmployeeId.Value == Guid.Empty))
+            (!employeeId.HasValue ||
+             employeeId.Value == Guid.Empty))
         {
             throw new ForbiddenException(
                 "Employee identity is required.");
         }
 
-        var employeeId = query.EmployeeId ?? Guid.Empty;
+        var currentEmpId = employeeId ?? Guid.Empty;
 
         var accessInfo = await context.TripProposals
             .AsNoTracking()
@@ -49,7 +52,7 @@ public class GetTripProposalByIdHandler(PayClaimDbContext context)
                 tp.Status,
 
                 IsParticipant = tp.Participants.Any(p =>
-                    p.EmployeeId == employeeId),
+                    p.EmployeeId == currentEmpId),
 
                 PicManagerId = tp.Participants
                     .Where(p => p.IsPic)
@@ -67,7 +70,7 @@ public class GetTripProposalByIdHandler(PayClaimDbContext context)
         bool isDirectManager =
             isManager &&
             accessInfo.Status == TripProposalStatus.Submitted &&
-            accessInfo.PicManagerId == employeeId;
+            accessInfo.PicManagerId == currentEmpId;
 
         bool isFinanceReviewer =
             isFinance &&

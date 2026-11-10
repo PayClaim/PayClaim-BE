@@ -1,4 +1,5 @@
-﻿using PayClaim.Common.Exceptions;
+using MediatR;
+using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
 
@@ -8,9 +9,9 @@ public record UpdateBenefitPlanCommand(
     string DepartmentId,
     Guid BenefitId,
     string PositionId,
-    UpsertBenefitPlanDto Request);
+    UpsertBenefitPlanDto Request) : IRequest;
 
-public class UpdateBenefitPlanHandler(IUnitOfWork uow)
+public class UpdateBenefitPlanHandler(IUnitOfWork uow) : IRequestHandler<UpdateBenefitPlanCommand>
 {
     public async Task Handle(
         UpdateBenefitPlanCommand command,

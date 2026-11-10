@@ -1,13 +1,13 @@
-﻿
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Data;
 using PayClaim.DTOs.Master;
 
 namespace PayClaim.Features.Departments.Queries.GetDepartment;
 
-public record GetDepartmentsQuery;
+public record GetDepartmentsQuery : IRequest<IReadOnlyCollection<DepartmentDto>>;
 
-public class GetDepartmentsHandler(PayClaimDbContext db)
+public class GetDepartmentsHandler(PayClaimDbContext db) : IRequestHandler<GetDepartmentsQuery, IReadOnlyCollection<DepartmentDto>>
 {
     public async Task<IReadOnlyCollection<DepartmentDto>> Handle(GetDepartmentsQuery query, CancellationToken ct)
         => await db.Departments

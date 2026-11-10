@@ -1,12 +1,13 @@
-﻿using PayClaim.Common.Exceptions;
+using MediatR;
+using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
 
 namespace PayClaim.Features.Benefits.Commands;
 
-public record UpdateBenefitCommand(Guid Id, UpdateBenefitDto Request);
+public record UpdateBenefitCommand(Guid Id, UpdateBenefitDto Request) : IRequest;
 
-public class UpdateBenefitHandler(IUnitOfWork uow)
+public class UpdateBenefitHandler(IUnitOfWork uow) : IRequestHandler<UpdateBenefitCommand>
 {
     public async Task Handle(
         UpdateBenefitCommand command,

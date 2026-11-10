@@ -1,4 +1,4 @@
-﻿
+using MediatR;
 using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
@@ -6,9 +6,9 @@ using PayClaim.Entities;
 
 namespace PayClaim.Features.Master.Departments.Commands.CreateDepartment;
 
-public record CreateDepartmentCommand(CreateDepartmentDto Request);
+public record CreateDepartmentCommand(CreateDepartmentDto Request) : IRequest<string>;
 
-public class CreateDepartmentHandler(IUnitOfWork uow)
+public class CreateDepartmentHandler(IUnitOfWork uow) : IRequestHandler<CreateDepartmentCommand, string>
 {
     public async Task<string> Handle(CreateDepartmentCommand command, CancellationToken ct)
     {
@@ -39,7 +39,6 @@ public class CreateDepartmentHandler(IUnitOfWork uow)
         };
 
         await uow.Departments.AddAsync(department, ct);
-
         await uow.SaveChangesAsync(ct);
 
         return department.Id;

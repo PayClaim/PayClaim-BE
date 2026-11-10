@@ -1,3 +1,4 @@
+using MediatR;
 using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
@@ -7,9 +8,9 @@ using System.Security.Cryptography;
 
 namespace PayClaim.Features.Employees.Commands.CreateEmployee;
 
-public record CreateEmployeeCommand(CreateEmployeeDto Request);
+public record CreateEmployeeCommand(CreateEmployeeDto Request) : IRequest<Guid>;
 
-public class CreateEmployeeHandler(IUnitOfWork uow, PayClaim.Common.Services.IEmailService emailService)
+public class CreateEmployeeHandler(IUnitOfWork uow, PayClaim.Common.Services.IEmailService emailService) : IRequestHandler<CreateEmployeeCommand, Guid>
 {
     public async Task<Guid> Handle(
         CreateEmployeeCommand command,

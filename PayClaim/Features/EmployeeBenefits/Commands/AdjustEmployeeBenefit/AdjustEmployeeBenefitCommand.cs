@@ -1,4 +1,5 @@
-﻿using PayClaim.Common.Exceptions;
+using MediatR;
+using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.EmployeeBenefit;
 
@@ -6,9 +7,9 @@ namespace PayClaim.Features.EmployeeBenefits.Commands;
 
 public record AdjustEmployeeBenefitCommand(
     Guid EmployeeBenefitId,
-    AdjustEmployeeBenefitDto Request);
+    AdjustEmployeeBenefitDto Request) : IRequest;
 
-public class AdjustEmployeeBenefitHandler(IUnitOfWork uow)
+public class AdjustEmployeeBenefitHandler(IUnitOfWork uow) : IRequestHandler<AdjustEmployeeBenefitCommand>
 {
     public async Task Handle(
         AdjustEmployeeBenefitCommand command,

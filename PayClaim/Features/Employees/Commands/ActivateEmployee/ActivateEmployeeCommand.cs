@@ -1,3 +1,4 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
 using PayClaim.Data;
@@ -5,9 +6,9 @@ using PayClaim.Entities;
 
 namespace PayClaim.Features.Employees.Commands.ActivateEmployee;
 
-public record ActivateEmployeeCommand(Guid Id);
+public record ActivateEmployeeCommand(Guid Id) : IRequest;
 
-public class ActivateEmployeeHandler(PayClaimDbContext db)
+public class ActivateEmployeeHandler(PayClaimDbContext db) : IRequestHandler<ActivateEmployeeCommand>
 {
     public async Task Handle(ActivateEmployeeCommand command, CancellationToken ct)
     {

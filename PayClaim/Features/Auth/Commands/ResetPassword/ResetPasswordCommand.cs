@@ -1,4 +1,5 @@
 using BCrypt.Net;
+using MediatR;
 using PayClaim.Common.Exceptions;
 using PayClaim.Common.Services;
 using PayClaim.Data.UnitOfWork;
@@ -7,9 +8,9 @@ using PayClaim.Entities;
 
 namespace PayClaim.Features.Auth.Commands.ResetPassword;
 
-public record ResetPasswordCommand(ResetPasswordRequestDto Request);
+public record ResetPasswordCommand(ResetPasswordRequestDto Request) : IRequest;
 
-public class ResetPasswordHandler(IUnitOfWork uow, IEmailService emailService)
+public class ResetPasswordHandler(IUnitOfWork uow, IEmailService emailService) : IRequestHandler<ResetPasswordCommand>
 {
     public async Task Handle(ResetPasswordCommand command, CancellationToken ct = default)
     {

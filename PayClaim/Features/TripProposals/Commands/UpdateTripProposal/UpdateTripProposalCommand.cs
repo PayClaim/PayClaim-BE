@@ -1,5 +1,8 @@
+using MediatR;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
@@ -9,12 +12,19 @@ using PayClaim.Enums;
 
 namespace PayClaim.Features.TripProposals.Commands.UpdateTripProposal;
 
-public record UpdateTripProposalCommand(Guid ProposalId, CreateTripProposalDto Request, Guid SubmitterEmployeeId);
+public record UpdateTripProposalCommand(Guid ProposalId, CreateTripProposalDto Request, Guid? SubmitterEmployeeId = null) : IRequest<TripProposalDetailDto>;
 
-public class UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext context, IFileStorageService fileStorage)
+public class UpdateTripProposalHandler(
+    IUnitOfWork uow,
+    PayClaimDbContext context,
+    IFileStorageService fileStorage,
+    ICurrentUser currentUser,
+    IHttpContextAccessor httpContextAccessor) : IRequestHandler<UpdateTripProposalCommand, TripProposalDetailDto>
 {
     public async Task<TripProposalDetailDto> Handle(UpdateTripProposalCommand command, CancellationToken ct = default)
     {
+        var submitterId = command.SubmitterEmployeeId ?? currentUser.RequiredEmployeeId;
+
         var proposal = await context.TripProposals
             .Include(tp => tp.Participants)
                 .ThenInclude(p => p.Employee)
@@ -34,13 +44,11 @@ public class UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext contex
                 "Trip proposal does not have a PIC.");
         }
 
-        if (currentPic.EmployeeId != command.SubmitterEmployeeId)
+        if (currentPic.EmployeeId != submitterId)
         {
             throw new ForbiddenException(
                 "Only the PIC can update this trip proposal.");
         }
-
-
 
         if (proposal.Status != TripProposalStatus.NeedsRevision && proposal.Status != TripProposalStatus.Submitted)
         {
@@ -49,6 +57,8 @@ public class UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext contex
         }
 
         var req = command.Request;
+
+        TripProposalParticipantParser.EnsureParticipants(req, httpContextAccessor.HttpContext?.Request);
 
         if (req.EndDate < req.StartDate)
         {
@@ -78,7 +88,7 @@ public class UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext contex
 
             var newPic = req.Participants.First(p => p.IsPic);
 
-            if (newPic.EmployeeId != command.SubmitterEmployeeId)
+            if (newPic.EmployeeId != submitterId)
             {
                 throw new ForbiddenException(
                     "The PIC of this proposal cannot be changed.");
@@ -120,7 +130,6 @@ public class UpdateTripProposalHandler(IUnitOfWork uow, PayClaimDbContext contex
 
         uow.TripProposals.Update(proposal);
         await uow.SaveChangesAsync(ct);
-
 
         var approvals = await context.TripApprovals
             .Where(a => a.TripProposalId == proposal.Id)

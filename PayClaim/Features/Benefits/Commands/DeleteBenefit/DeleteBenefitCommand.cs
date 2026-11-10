@@ -1,11 +1,12 @@
-﻿using PayClaim.Common.Exceptions;
+using MediatR;
+using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 
 namespace PayClaim.Features.Benefits.Commands;
 
-public record DeleteBenefitCommand(Guid Id);
+public record DeleteBenefitCommand(Guid Id) : IRequest;
 
-public class DeleteBenefitHandler(IUnitOfWork uow)
+public class DeleteBenefitHandler(IUnitOfWork uow) : IRequestHandler<DeleteBenefitCommand>
 {
     public async Task Handle(
         DeleteBenefitCommand command,

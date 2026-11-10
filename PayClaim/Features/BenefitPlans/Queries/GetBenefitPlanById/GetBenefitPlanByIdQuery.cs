@@ -1,13 +1,14 @@
-﻿using Microsoft.EntityFrameworkCore;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
 using PayClaim.Data;
 using PayClaim.DTOs.Master;
 
 namespace PayClaim.Features.BenefitPlans.Queries;
 
-public record GetBenefitPlanByIdQuery(string DepartmentId, Guid BenefitId, string PositionId);
+public record GetBenefitPlanByIdQuery(string DepartmentId, Guid BenefitId, string PositionId) : IRequest<BenefitPlanDto>;
 
-public class GetBenefitPlanByIdHandler(PayClaimDbContext db)
+public class GetBenefitPlanByIdHandler(PayClaimDbContext db) : IRequestHandler<GetBenefitPlanByIdQuery, BenefitPlanDto>
 {
     public async Task<BenefitPlanDto> Handle(GetBenefitPlanByIdQuery query, CancellationToken ct)
     {

@@ -1,6 +1,8 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Constants;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
@@ -13,18 +15,22 @@ namespace PayClaim.Features.TripProposals.Commands.ApproveTripProposal;
 public record ApproveTripProposalCommand(
     Guid ProposalId,
     TripApprovalActionDto Request,
-    Guid LoggedInApproverId,
-    string[] ApproverRoles);
+    Guid? LoggedInApproverId = null,
+    string[]? ApproverRoles = null) : IRequest<TripApprovalHistoryDto>;
 
 public class ApproveTripProposalHandler(
     IUnitOfWork uow,
     PayClaimDbContext context,
-    IEmailService emailService)
+    IEmailService emailService,
+    ICurrentUser currentUser) : IRequestHandler<ApproveTripProposalCommand, TripApprovalHistoryDto>
 {
     public async Task<TripApprovalHistoryDto> Handle(
         ApproveTripProposalCommand command,
         CancellationToken ct = default)
     {
+        var approverId = command.LoggedInApproverId ?? currentUser.RequiredEmployeeId;
+        var approverRoles = command.ApproverRoles ?? currentUser.Roles;
+
         var proposal = await context.TripProposals
             .Include(tp => tp.Participants)
                 .ThenInclude(p => p.Employee)
@@ -40,7 +46,7 @@ public class ApproveTripProposalHandler(
         var approver = await context.Employees
             .AsNoTracking()
             .FirstOrDefaultAsync(
-                e => e.Id == command.LoggedInApproverId, ct);
+                e => e.Id == approverId, ct);
 
         if (approver == null)
         {
@@ -69,16 +75,16 @@ public class ApproveTripProposalHandler(
                 "You cannot approve your own trip proposal.");
         }
 
-        bool hasManagerRole = command.ApproverRoles.Contains(
+        bool hasManagerRole = approverRoles.Contains(
             "Manager", StringComparer.OrdinalIgnoreCase);
 
-        bool hasFinanceRole = command.ApproverRoles.Contains(
+        bool hasFinanceRole = approverRoles.Contains(
             "Finance", StringComparer.OrdinalIgnoreCase);
 
-        bool hasFinanceManagerRole = command.ApproverRoles.Contains(
+        bool hasFinanceManagerRole = approverRoles.Contains(
             "Finance Manager", StringComparer.OrdinalIgnoreCase);
 
-        bool hasAdminRole = command.ApproverRoles.Contains(
+        bool hasAdminRole = approverRoles.Contains(
             "Admin", StringComparer.OrdinalIgnoreCase);
 
         byte currentLevel;

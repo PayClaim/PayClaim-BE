@@ -1,6 +1,7 @@
-
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Data;
 using PayClaim.DTOs.Common;
 using PayClaim.DTOs.TripProposal;
@@ -10,17 +11,18 @@ namespace PayClaim.Features.TripProposals.Queries.GetTripProposals;
 
 public record GetTripProposalsQuery(
     TripProposalFilterQuery Filter,
-    Guid? EmployeeId,
-    string[] Roles);
+    Guid? EmployeeId = null,
+    string[]? Roles = null) : IRequest<PagedResponse<TripProposalListDto>>;
 
-public class GetTripProposalsHandler(PayClaimDbContext context)
+public class GetTripProposalsHandler(PayClaimDbContext context, ICurrentUser currentUser) : IRequestHandler<GetTripProposalsQuery, PagedResponse<TripProposalListDto>>
 {
     public async Task<PagedResponse<TripProposalListDto>> Handle(
         GetTripProposalsQuery query,
         CancellationToken ct = default)
     {
         var filter = query.Filter;
-        var roles = query.Roles ?? Array.Empty<string>();
+        var roles = query.Roles ?? currentUser.Roles;
+        var employeeId = query.EmployeeId ?? currentUser.EmployeeId;
 
         bool isAdmin = roles.Contains(
             "Admin", StringComparer.OrdinalIgnoreCase);
@@ -41,20 +43,20 @@ public class GetTripProposalsHandler(PayClaimDbContext context)
         // 1. Filter berdasarkan hak akses user
         if (!isAdmin)
         {
-            if (!query.EmployeeId.HasValue ||
-                query.EmployeeId.Value == Guid.Empty)
+            if (!employeeId.HasValue ||
+                employeeId.Value == Guid.Empty)
             {
                 throw new ForbiddenException(
                     "Employee identity is required.");
             }
 
-            var employeeId = query.EmployeeId.Value;
+            var currentEmpId = employeeId.Value;
 
             dbQuery = dbQuery.Where(tp =>
                 // Employee atau participant hanya melihat proposal
                 // yang melibatkan dirinya.
                 tp.Participants.Any(p =>
-                    p.EmployeeId == employeeId)
+                    p.EmployeeId == currentEmpId)
 
                 ||
 
@@ -65,7 +67,7 @@ public class GetTripProposalsHandler(PayClaimDbContext context)
                     tp.Status == TripProposalStatus.Submitted &&
                     tp.Participants.Any(p =>
                         p.IsPic &&
-                        p.Employee.ManagerId == employeeId)
+                        p.Employee.ManagerId == currentEmpId)
                 )
 
                 ||

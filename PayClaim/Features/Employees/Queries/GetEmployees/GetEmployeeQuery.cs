@@ -1,12 +1,13 @@
-﻿using Microsoft.EntityFrameworkCore;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
 using PayClaim.Data;
 using PayClaim.DTOs.Master;
 
 namespace PayClaim.Features.Employees.Queries.GetEmployees;
 
-public record GetEmployeesQuery();
+public record GetEmployeesQuery : IRequest<List<EmployeeDto>>;
 
-public class GetEmployeesHandler(PayClaimDbContext db)
+public class GetEmployeesHandler(PayClaimDbContext db) : IRequestHandler<GetEmployeesQuery, List<EmployeeDto>>
 {
     public async Task<List<EmployeeDto>> Handle(GetEmployeesQuery query, CancellationToken ct)
     {
@@ -30,9 +31,9 @@ public class GetEmployeesHandler(PayClaimDbContext db)
 
                 ManagerId = e.ManagerId,
                 ManagerName = e.Manager != null
-                ? e.Manager.FullName
-            : null
-                })
+                    ? e.Manager.FullName
+                    : null
+            })
             .ToListAsync(ct);
     }
 }

@@ -1,5 +1,8 @@
+using MediatR;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
@@ -10,19 +13,22 @@ namespace PayClaim.Features.TripProposals.Commands.CompleteTripProposal;
 
 public record CompleteTripProposalCommand(
     Guid ProposalId,
-    Guid SubmitterEmployeeId,
+    Guid? SubmitterEmployeeId = null,
     IFormFile? ReportFile = null,
-    string? ReportNotes = null);
+    string? ReportNotes = null) : IRequest<TripProposalDetailDto>;
 
 public class CompleteTripProposalHandler(
     IUnitOfWork uow,
     PayClaimDbContext context,
-    IFileStorageService fileStorage)
+    IFileStorageService fileStorage,
+    ICurrentUser currentUser) : IRequestHandler<CompleteTripProposalCommand, TripProposalDetailDto>
 {
     public async Task<TripProposalDetailDto> Handle(
         CompleteTripProposalCommand command,
         CancellationToken ct = default)
     {
+        var submitterId = command.SubmitterEmployeeId ?? currentUser.RequiredEmployeeId;
+
         var proposal = await context.TripProposals
             .Include(tp => tp.Participants)
                 .ThenInclude(p => p.Employee)
@@ -34,7 +40,6 @@ public class CompleteTripProposalHandler(
             throw new NotFoundException(
                 $"Trip proposal with ID '{command.ProposalId}' was not found.");
         }
-
 
         if (proposal.Status != TripProposalStatus.Approved)
         {
@@ -51,12 +56,11 @@ public class CompleteTripProposalHandler(
                 "Trip proposal does not have a PIC.");
         }
 
-        if (pic.EmployeeId != command.SubmitterEmployeeId)
+        if (pic.EmployeeId != submitterId)
         {
             throw new ForbiddenException(
                 "Only the PIC can submit the travel report.");
         }
-
 
         if (command.ReportFile != null &&
             command.ReportFile.Length > 0)

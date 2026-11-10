@@ -1,13 +1,14 @@
-﻿using PayClaim.Data.UnitOfWork;
+using MediatR;
+using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
 using PayClaim.Entities;
 using PayClaim.Common.Exceptions;
 
 namespace PayClaim.Features.Benefits.Commands;
 
-public record CreateBenefitCommand(CreateBenefitDto Request);
+public record CreateBenefitCommand(CreateBenefitDto Request) : IRequest<Guid>;
 
-public class CreateBenefitHandler(IUnitOfWork uow)
+public class CreateBenefitHandler(IUnitOfWork uow) : IRequestHandler<CreateBenefitCommand, Guid>
 {
     public async Task<Guid> Handle(CreateBenefitCommand command, CancellationToken ct)
     {

@@ -1,5 +1,7 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Data;
 using PayClaim.DTOs.Claim;
 using PayClaim.DTOs.Common;
@@ -9,19 +11,19 @@ namespace PayClaim.Features.Claims.Queries.GetClaims;
 
 public record GetClaimsQuery(
     ClaimFilterQuery Filter,
-    Guid? RequesterEmployeeId,
-    IReadOnlyCollection<string> RequesterRoles,
-    bool IsMyClaims = false);
+    Guid? RequesterEmployeeId = null,
+    IReadOnlyCollection<string>? RequesterRoles = null,
+    bool IsMyClaims = false) : IRequest<PagedResponse<ClaimListDto>>;
 
-public class GetClaimsHandler(PayClaimDbContext context)
+public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUser) : IRequestHandler<GetClaimsQuery, PagedResponse<ClaimListDto>>
 {
-
     public async Task<PagedResponse<ClaimListDto>> Handle(
         GetClaimsQuery query,
         CancellationToken ct = default)
     {
         var filter = query.Filter;
-        var roles = query.RequesterRoles ?? Array.Empty<string>();
+        var roles = query.RequesterRoles ?? currentUser.Roles;
+        var employeeId = query.RequesterEmployeeId ?? currentUser.EmployeeId;
 
         var dbQuery = context.Claims
             .AsNoTracking()
@@ -40,20 +42,20 @@ public class GetClaimsHandler(PayClaimDbContext context)
 
         if (query.IsMyClaims)
         {
-            if (!query.RequesterEmployeeId.HasValue ||
-                query.RequesterEmployeeId.Value == Guid.Empty)
+            if (!employeeId.HasValue ||
+                employeeId.Value == Guid.Empty)
             {
                 throw new ForbiddenException(
                     "Employee identity is required to access your claims.");
             }
 
             dbQuery = dbQuery.Where(c =>
-                c.EmployeeId == query.RequesterEmployeeId.Value);
+                c.EmployeeId == employeeId.Value);
         }
         else if (!isAdmin)
         {
-            if (!query.RequesterEmployeeId.HasValue ||
-                query.RequesterEmployeeId.Value == Guid.Empty)
+            if (!employeeId.HasValue ||
+                employeeId.Value == Guid.Empty)
             {
                 throw new ForbiddenException(
                     "Employee identity is required.");
@@ -65,8 +67,7 @@ public class GetClaimsHandler(PayClaimDbContext context)
                     "You are not allowed to access all claims.");
             }
 
-            var requesterEmployeeId =
-                query.RequesterEmployeeId.Value;
+            var requesterEmployeeId = employeeId.Value;
 
             dbQuery = dbQuery.Where(c =>
                 (

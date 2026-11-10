@@ -1,12 +1,13 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
 using PayClaim.Data;
 
 namespace PayClaim.Features.Employees.Commands.DeleteEmployee;
 
-public record DeleteEmployeeCommand(Guid Id);
+public record DeleteEmployeeCommand(Guid Id) : IRequest;
 
-public class DeleteEmployeeHandler(PayClaimDbContext db)
+public class DeleteEmployeeHandler(PayClaimDbContext db) : IRequestHandler<DeleteEmployeeCommand>
 {
     public async Task Handle(DeleteEmployeeCommand command, CancellationToken ct)
     {

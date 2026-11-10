@@ -1,13 +1,14 @@
-﻿using Microsoft.EntityFrameworkCore;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
 using PayClaim.Data;
 using PayClaim.DTOs.Master;
 
 namespace PayClaim.Features.Employees.Queries.GetEmployeeById;
 
-public record GetEmployeeByIdQuery(Guid Id);
+public record GetEmployeeByIdQuery(Guid Id) : IRequest<EmployeeDto>;
 
-public class GetEmployeeByIdHandler(PayClaimDbContext db)
+public class GetEmployeeByIdHandler(PayClaimDbContext db) : IRequestHandler<GetEmployeeByIdQuery, EmployeeDto>
 {
     public async Task<EmployeeDto> Handle(GetEmployeeByIdQuery query, CancellationToken ct)
     {
@@ -31,8 +32,8 @@ public class GetEmployeeByIdHandler(PayClaimDbContext db)
 
                 ManagerId = e.ManagerId,
                 ManagerName = e.Manager != null
-                ? e.Manager.FullName
-                : null
+                    ? e.Manager.FullName
+                    : null
             })
             .FirstOrDefaultAsync(ct);
 

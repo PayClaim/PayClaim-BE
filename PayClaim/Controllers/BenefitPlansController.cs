@@ -1,3 +1,4 @@
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.Master;
@@ -8,17 +9,13 @@ namespace PayClaim.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class BenefitPlansController(
-    CreateBenefitPlanHandler createHandler, GetBenefitPlansHandler getAllHandler, GetBenefitPlanByIdHandler getByIdHandler,
-    UpdateBenefitPlanHandler updateHandler, DeleteBenefitPlanHandler deleteHandler) : ControllerBase
+public class BenefitPlansController(ISender sender) : ControllerBase
 {
     [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<ActionResult<List<BenefitPlanDto>>> GetAll(CancellationToken ct)
     {
-        var result = await getAllHandler.Handle(
-            new GetBenefitPlansQuery(), ct);
-
+        var result = await sender.Send(new GetBenefitPlansQuery(), ct);
         return Ok(result);
     }
 
@@ -26,12 +23,7 @@ public class BenefitPlansController(
     [HttpGet("{departmentId}/{benefitId:guid}/{positionId}")]
     public async Task<ActionResult<BenefitPlanDto>> GetById(string departmentId, Guid benefitId, string positionId, CancellationToken ct)
     {
-        var result = await getByIdHandler.Handle(
-            new GetBenefitPlanByIdQuery(
-                departmentId,
-                benefitId,
-                positionId), ct);
-
+        var result = await sender.Send(new GetBenefitPlanByIdQuery(departmentId, benefitId, positionId), ct);
         return Ok(result);
     }
 
@@ -39,24 +31,20 @@ public class BenefitPlansController(
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] UpsertBenefitPlanDto request, CancellationToken ct)
     {
-        await createHandler.Handle(
-            new CreateBenefitPlanCommand(request), ct);
-
+        await sender.Send(new CreateBenefitPlanCommand(request), ct);
         return Ok(new { message = "Benefit plan created successfully." });
     }
 
     [Authorize(Roles = "Admin")]
     [HttpPut("{departmentId}/{benefitId:guid}/{positionId}")]
-    public async Task<IActionResult> Update(string departmentId, Guid benefitId, string positionId, 
-        [FromBody] UpsertBenefitPlanDto request, CancellationToken ct)
+    public async Task<IActionResult> Update(
+        string departmentId,
+        Guid benefitId,
+        string positionId, 
+        [FromBody] UpsertBenefitPlanDto request,
+        CancellationToken ct)
     {
-        await updateHandler.Handle(
-            new UpdateBenefitPlanCommand(
-                departmentId,
-                benefitId,
-                positionId,
-                request), ct);
-
+        await sender.Send(new UpdateBenefitPlanCommand(departmentId, benefitId, positionId, request), ct);
         return Ok(new { message = "Benefit plan updated successfully." });
     }
 
@@ -64,12 +52,7 @@ public class BenefitPlansController(
     [HttpDelete("{departmentId}/{benefitId:guid}/{positionId}")]
     public async Task<IActionResult> Delete(string departmentId, Guid benefitId, string positionId, CancellationToken ct)
     {
-        await deleteHandler.Handle(
-            new DeleteBenefitPlanCommand(
-                departmentId,
-                benefitId,
-                positionId), ct);
-
+        await sender.Send(new DeleteBenefitPlanCommand(departmentId, benefitId, positionId), ct);
         return Ok(new { message = "Benefit plan deleted successfully." });
     }
 }

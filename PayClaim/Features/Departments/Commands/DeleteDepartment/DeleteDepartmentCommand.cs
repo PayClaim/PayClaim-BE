@@ -1,11 +1,12 @@
-﻿using PayClaim.Common.Exceptions;
+using MediatR;
+using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 
 namespace PayClaim.Features.Master.Departments.Commands.DeleteDepartment;
 
-public record DeleteDepartmentCommand(string Id);
+public record DeleteDepartmentCommand(string Id) : IRequest;
 
-public class DeleteDepartmentHandler(IUnitOfWork uow)
+public class DeleteDepartmentHandler(IUnitOfWork uow) : IRequestHandler<DeleteDepartmentCommand>
 {
     public async Task Handle(
         DeleteDepartmentCommand command,

@@ -1,3 +1,4 @@
+using MediatR;
 using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
@@ -5,9 +6,9 @@ using PayClaim.Entities;
 
 namespace PayClaim.Features.Employees.Commands.UpdateEmployee;
 
-public record UpdateEmployeeCommand(Guid Id, UpdateEmployeeDto Request);
+public record UpdateEmployeeCommand(Guid Id, UpdateEmployeeDto Request) : IRequest;
 
-public class UpdateEmployeeHandler(IUnitOfWork uow)
+public class UpdateEmployeeHandler(IUnitOfWork uow) : IRequestHandler<UpdateEmployeeCommand>
 {
     public async Task Handle(UpdateEmployeeCommand command, CancellationToken ct)
     {

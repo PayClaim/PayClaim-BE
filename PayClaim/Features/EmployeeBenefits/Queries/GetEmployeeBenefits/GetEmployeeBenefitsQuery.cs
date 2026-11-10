@@ -1,19 +1,21 @@
-﻿using Microsoft.EntityFrameworkCore;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
 using PayClaim.Data;
 using PayClaim.DTOs.EmployeeBenefit;
 using PayClaim.DTOs.Master;
 
 namespace PayClaim.Features.EmployeeBenefits.Query.GetEmployeeBenefits;
 
-public record GetEmployeeBenefitsQuery(EmployeeBenefitFilterQuery Filter);
+public record GetEmployeeBenefitsQuery(EmployeeBenefitFilterQuery Filter) : IRequest<List<MyBenefitSummaryDto>>;
 
-public class GetEmployeeBenefitsHandler(PayClaimDbContext db)
+public class GetEmployeeBenefitsHandler(PayClaimDbContext db) : IRequestHandler<GetEmployeeBenefitsQuery, List<MyBenefitSummaryDto>>
 {
     public async Task<List<MyBenefitSummaryDto>> Handle(GetEmployeeBenefitsQuery query, CancellationToken ct)
     {
         var employeeBenefits = db.EmployeeBenefits
             .AsNoTracking()
             .AsQueryable();
+
         if (query.Filter.EmployeeId.HasValue)
         {
             employeeBenefits = employeeBenefits.Where(eb => eb.EmployeeId == query.Filter.EmployeeId.Value);
@@ -39,7 +41,6 @@ public class GetEmployeeBenefitsHandler(PayClaimDbContext db)
                 EndDate = eb.EndDate,
                 IsActive = eb.StartDate <= today && eb.EndDate >= today,
                 EmployeeName = eb.Employee.FullName,
-
             })
             .ToListAsync(ct);
     }

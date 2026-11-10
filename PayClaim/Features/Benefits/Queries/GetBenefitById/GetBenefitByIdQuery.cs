@@ -1,13 +1,14 @@
-﻿using Microsoft.EntityFrameworkCore;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
 using PayClaim.Data;
 using PayClaim.DTOs.Master;
 
 namespace PayClaim.Features.Benefits.Queries;
 
-public record GetBenefitByIdQuery(Guid Id);
+public record GetBenefitByIdQuery(Guid Id) : IRequest<BenefitDto>;
 
-public class GetBenefitByIdHandler(PayClaimDbContext db)
+public class GetBenefitByIdHandler(PayClaimDbContext db) : IRequestHandler<GetBenefitByIdQuery, BenefitDto>
 {
     public async Task<BenefitDto> Handle(
         GetBenefitByIdQuery query,

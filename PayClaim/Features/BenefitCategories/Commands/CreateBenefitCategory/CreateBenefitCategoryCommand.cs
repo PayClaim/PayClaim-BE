@@ -1,4 +1,5 @@
-﻿using PayClaim.Common.Exceptions;
+using MediatR;
+using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
 using PayClaim.Entities;
@@ -7,9 +8,9 @@ namespace PayClaim.Features.BenefitCategories.Commands.CreateBenefitCategory;
 
 public record CreateBenefitCategoryCommand(
     CreateBenefitCategoryDto Request
-);
+) : IRequest<int>;
 
-public class CreateBenefitCategoryHandler(IUnitOfWork uow)
+public class CreateBenefitCategoryHandler(IUnitOfWork uow) : IRequestHandler<CreateBenefitCategoryCommand, int>
 {
     public async Task<int> Handle(CreateBenefitCategoryCommand command, CancellationToken ct)
     {

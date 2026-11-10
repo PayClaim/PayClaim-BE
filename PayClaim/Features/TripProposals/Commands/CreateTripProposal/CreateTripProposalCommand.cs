@@ -1,4 +1,7 @@
+using MediatR;
+using Microsoft.AspNetCore.Http;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Security;
 using PayClaim.Common.Services;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.TripProposal;
@@ -7,22 +10,20 @@ using PayClaim.Enums;
 
 namespace PayClaim.Features.TripProposals.Commands.CreateTripProposal;
 
-public record CreateTripProposalCommand(CreateTripProposalDto Request, Guid SubmitterEmployeeId);
+public record CreateTripProposalCommand(CreateTripProposalDto Request, Guid? SubmitterEmployeeId = null) : IRequest<TripProposalDetailDto>;
 
-public class CreateTripProposalHandler
+public class CreateTripProposalHandler(
+    IUnitOfWork uow,
+    IFileStorageService fileStorage,
+    ICurrentUser currentUser,
+    IHttpContextAccessor httpContextAccessor) : IRequestHandler<CreateTripProposalCommand, TripProposalDetailDto>
 {
-    private readonly IUnitOfWork _uow;
-    private readonly IFileStorageService _fileStorage;
-
-    public CreateTripProposalHandler(IUnitOfWork uow, IFileStorageService fileStorage)
-    {
-        _uow = uow;
-        _fileStorage = fileStorage;
-    }
-
     public async Task<TripProposalDetailDto> Handle(CreateTripProposalCommand command, CancellationToken ct = default)
     {
+        var submitterId = command.SubmitterEmployeeId ?? currentUser.RequiredEmployeeId;
         var request = command.Request;
+
+        TripProposalParticipantParser.EnsureParticipants(request, httpContextAccessor.HttpContext?.Request);
 
         if (request.EndDate < request.StartDate)
         {
@@ -40,16 +41,13 @@ public class CreateTripProposalHandler
             throw new BusinessRuleException("A trip proposal must have exactly one Person In Charge (PIC).");
         }
 
-
         var pic = request.Participants.First(p => p.IsPic);
 
-        if (pic.EmployeeId != command.SubmitterEmployeeId)
+        if (pic.EmployeeId != submitterId)
         {
             throw new ForbiddenException(
                 "Only the logged-in employee can submit a proposal as its PIC.");
         }
-
-
 
         var duplicateEmployees = request.Participants
             .GroupBy(p => p.EmployeeId)
@@ -71,7 +69,7 @@ public class CreateTripProposalHandler
         var participantDtos = new List<ParticipantItemDto>();
         foreach (var p in request.Participants)
         {
-            var employee = await _uow.Employees.GetByIdAsync(new object[] { p.EmployeeId }, ct);
+            var employee = await uow.Employees.GetByIdAsync(new object[] { p.EmployeeId }, ct);
             if (employee == null)
             {
                 throw new NotFoundException($"Employee with ID '{p.EmployeeId}' was not found.");
@@ -90,7 +88,7 @@ public class CreateTripProposalHandler
         var filePath = string.Empty;
         if (request.File != null && request.File.Length > 0)
         {
-            filePath = await _fileStorage.SaveFileAsync(request.File, "proposals", ct);
+            filePath = await fileStorage.SaveFileAsync(request.File, "proposals", ct);
         }
 
         var proposal = new TripProposal
@@ -117,8 +115,8 @@ public class CreateTripProposalHandler
             });
         }
 
-        await _uow.TripProposals.AddAsync(proposal, ct);
-        await _uow.SaveChangesAsync(ct);
+        await uow.TripProposals.AddAsync(proposal, ct);
+        await uow.SaveChangesAsync(ct);
 
         return new TripProposalDetailDto
         {

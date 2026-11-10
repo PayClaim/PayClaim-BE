@@ -79,6 +79,7 @@ public class GetClaimByIdHandler(PayClaimDbContext context, ICurrentUser current
                 EmployeeId = c.EmployeeId,
                 EmployeeName = c.Employee.FullName,
                 EmployeeNumber = c.Employee.Number,
+                ManagerName = c.Employee.Manager != null ? c.Employee.Manager.FullName : null,
                 DepartmentName = c.Employee.Department.Name,
 
                 EmployeeBenefitId = c.EmployeeBenefitId,

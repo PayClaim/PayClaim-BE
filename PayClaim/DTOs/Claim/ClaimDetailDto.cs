@@ -26,6 +26,8 @@ public class ClaimDetailDto
 
     public string EmployeeNumber { get; set; } = string.Empty;
 
+    public string? ManagerName { get; set; }
+
     public string? DepartmentName { get; set; }
 
     public Guid? EmployeeBenefitId { get; set; }

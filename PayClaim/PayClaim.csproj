@@ -6,16 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
-  <ItemGroup>
-    <Compile Remove="Common\Middlewares\**" />
-    <Compile Remove="NewFolder\**" />
-    <Content Remove="Common\Middlewares\**" />
-    <Content Remove="NewFolder\**" />
-    <EmbeddedResource Remove="Common\Middlewares\**" />
-    <EmbeddedResource Remove="NewFolder\**" />
-    <None Remove="Common\Middlewares\**" />
-    <None Remove="NewFolder\**" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="MailKit" Version="4.18.2" />
@@ -29,6 +19,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.*" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.1" />
   </ItemGroup>
 

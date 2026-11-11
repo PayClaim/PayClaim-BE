@@ -18,6 +18,8 @@ public class TripProposalListDto
 
     public TripProposalStatus Status { get; set; }
 
+    public Guid? PicEmployeeId { get; set; }
+
     public string? PicName { get; set; }
 
     public int ParticipantCount { get; set; }

@@ -147,6 +147,11 @@ public class GetTripProposalsHandler(PayClaimDbContext context, ICurrentUser cur
                 SubmittedAt = tp.SubmittedAt,
                 Status = tp.Status,
 
+                PicEmployeeId = tp.Participants
+                    .Where(p => p.IsPic)
+                    .Select(p => (Guid?)p.EmployeeId)
+                    .FirstOrDefault(),
+
                 PicName = tp.Participants
                     .Where(p => p.IsPic)
                     .Select(p => p.Employee.FullName)

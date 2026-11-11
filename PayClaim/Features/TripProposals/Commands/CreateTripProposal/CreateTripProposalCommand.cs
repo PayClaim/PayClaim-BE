@@ -25,8 +25,22 @@ public class CreateTripProposalHandler(
         CreateTripProposalCommand command,
         CancellationToken ct = default)
     {
-        var submitterId =
-            command.SubmitterEmployeeId ?? currentUser.RequiredEmployeeId;
+        var submitterId = command.SubmitterEmployeeId ?? currentUser.RequiredEmployeeId;
+        var roles = currentUser.Roles;
+
+        // Cegah role Admin membuat proposal perjalanan dinas
+        if (roles.Contains("Admin", StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ForbiddenException(
+                "Akun Administrator tidak diperbolehkan mengajukan proposal perjalanan dinas.");
+        }
+
+        var submitterEmployee = await uow.Employees.GetByIdAsync(new object[] { submitterId }, ct);
+        if (submitterEmployee != null && string.Equals(submitterEmployee.PositionId, "DIR", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ForbiddenException(
+                "Posisi Director tidak diperbolehkan mengajukan proposal perjalanan dinas.");
+        }
 
         var request = command.Request;
 

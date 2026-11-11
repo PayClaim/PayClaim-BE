@@ -4,6 +4,7 @@ using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
 using PayClaim.Entities;
 using PayClaim.Enums;
+using PayClaim.Features.EmployeeBenefits;
 using System.Security.Cryptography;
 
 namespace PayClaim.Features.Employees.Commands.CreateEmployee;
@@ -111,31 +112,7 @@ public class CreateEmployeeHandler(IUnitOfWork uow, PayClaim.Common.Services.IEm
                     $"Benefit with ID {plan.BenefitId} was not found.");
             }
 
-            DateOnly endDate;
-
-            switch (benefit.PeriodType)
-            {
-                case BenefitPeriodType.Monthly:
-                    endDate = request.HireDate
-                        .AddMonths(1)
-                        .AddDays(-1);
-                    break;
-
-                case BenefitPeriodType.Yearly:
-                    endDate = request.HireDate
-                        .AddYears(1)
-                        .AddDays(-1);
-                    break;
-
-                case BenefitPeriodType.OneTime:
-                    endDate = request.HireDate
-                        .AddYears(1)
-                        .AddDays(-1);
-                    break;
-
-                default:
-                    throw new BusinessRuleException("Invalid benefit period type.");
-            }
+            var (startDate, endDate) = BenefitPeriodHelper.GetCurrentPeriod(benefit.PeriodType);
 
             employeeBenefits.Add(new EmployeeBenefit
             {
@@ -143,7 +120,7 @@ public class CreateEmployeeHandler(IUnitOfWork uow, PayClaim.Common.Services.IEm
                 EmployeeId = Guid.Empty, // Set after Employee is created
                 BenefitId = plan.BenefitId,
                 Balance = plan.LimitAmount,
-                StartDate = request.HireDate,
+                StartDate = startDate,
                 EndDate = endDate
             });
         }

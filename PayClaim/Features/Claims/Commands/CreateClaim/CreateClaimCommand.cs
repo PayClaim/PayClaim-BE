@@ -50,6 +50,13 @@ public class CreateClaimHandler(
             throw new NotFoundException("Employee not found.");
         }
 
+        // Cegah posisi Director membuat claim reimbursement
+        if (string.Equals(employee.PositionId, "DIR", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ForbiddenException(
+                "Posisi Director tidak diperbolehkan mengajukan klaim reimbursement.");
+        }
+
         if (!employee.IsActive)
         {
             throw new BusinessRuleException(

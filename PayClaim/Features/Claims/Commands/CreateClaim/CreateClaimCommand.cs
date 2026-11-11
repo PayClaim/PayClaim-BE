@@ -176,6 +176,14 @@ public class CreateClaimHandler(
                         "This employee is not registered as a participant in the specified business trip proposal.");
                 }
 
+                // Pastikan tanggal invoice / transaksi berada dalam periode perjalanan dinas
+                if (request.TransactionDate < trip.StartDate ||
+                    request.TransactionDate > trip.EndDate)
+                {
+                    throw new BusinessRuleException(
+                        $"Tanggal invoice ({request.TransactionDate:yyyy-MM-dd}) harus berada di dalam periode perjalanan dinas ({trip.StartDate:yyyy-MM-dd} s/d {trip.EndDate:yyyy-MM-dd}).");
+                }
+
                 var existingClaimedAmount = await context.Claims
                     .Where(c => c.TripProposalId == trip.Id &&
                                 c.EmployeeId == employee.Id &&

@@ -1,3 +1,4 @@
+using System.Net;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
@@ -18,43 +19,49 @@ public class EmailService : IEmailService
         _logger = logger;
     }
 
-    public async Task SendEmailAsync(string toEmail, string toName, string subject, string htmlBody, CancellationToken ct = default)
+    private static string Enc(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
+
+    public Task SendEmailAsync(string toEmail, string toName, string subject, string htmlBody, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(_settings.Host))
         {
             _logger.LogWarning("SMTP host not configured. Skipped sending email to {ToEmail}", toEmail);
-            return;
+            return Task.CompletedTask;
         }
 
-        try
+        _ = Task.Run(async () =>
         {
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
-
-            var message = new MimeMessage();
-            message.From.Add(new MailboxAddress(_settings.SenderName, _settings.SenderEmail));
-            message.To.Add(new MailboxAddress(string.IsNullOrWhiteSpace(toName) ? toEmail : toName, toEmail));
-            message.Subject = subject;
-            message.Body = new TextPart(TextFormat.Html) { Text = htmlBody };
-
-            using var client = new SmtpClient();
-            var secureOption = _settings.EnableSsl ? SecureSocketOptions.StartTlsWhenAvailable : SecureSocketOptions.None;
-            await client.ConnectAsync(_settings.Host, _settings.Port, secureOption, linkedCts.Token);
-
-            if (!string.IsNullOrWhiteSpace(_settings.Username))
+            try
             {
-                await client.AuthenticateAsync(_settings.Username, _settings.Password ?? "", linkedCts.Token);
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
+                var message = new MimeMessage();
+                message.From.Add(new MailboxAddress(_settings.SenderName, _settings.SenderEmail));
+                message.To.Add(new MailboxAddress(string.IsNullOrWhiteSpace(toName) ? toEmail : toName, toEmail));
+                message.Subject = subject;
+                message.Body = new TextPart(TextFormat.Html) { Text = htmlBody };
+
+                using var client = new SmtpClient();
+                var secureOption = _settings.EnableSsl ? SecureSocketOptions.StartTlsWhenAvailable : SecureSocketOptions.None;
+                await client.ConnectAsync(_settings.Host, _settings.Port, secureOption, timeoutCts.Token);
+
+                if (!string.IsNullOrWhiteSpace(_settings.Username))
+                {
+                    await client.AuthenticateAsync(_settings.Username, _settings.Password ?? "", timeoutCts.Token);
+                }
+
+                await client.SendAsync(message, timeoutCts.Token);
+                await client.DisconnectAsync(true, timeoutCts.Token);
+
+                _logger.LogInformation("Email sent successfully to {ToEmail} - Subject: {Subject}", toEmail, subject);
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while sending email to {ToEmail}. Workflow will continue safely.", toEmail);
+            }
+        }, CancellationToken.None);
 
-            await client.SendAsync(message, linkedCts.Token);
-            await client.DisconnectAsync(true, linkedCts.Token);
-
-            _logger.LogInformation("Email sent successfully to {ToEmail} - Subject: {Subject}", toEmail, subject);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while sending email to {ToEmail}. Workflow will continue safely.", toEmail);
-        }
+        return Task.CompletedTask;
     }
 
     public async Task SendWelcomeEmployeeEmailAsync(
@@ -69,6 +76,12 @@ public class EmailService : IEmailService
     {
         var subject = $"[PayClaim] Selamat Bergabung di Perusahaan - Informasi Akun Karyawan";
         var changePasswordUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/change-password";
+        fullName = Enc(fullName);
+        employeeNumber = Enc(employeeNumber);
+        username = Enc(username);
+        tempPassword = Enc(tempPassword);
+        departmentName = Enc(departmentName);
+        positionTitle = Enc(positionTitle);
 
         var html = $@"
 <!DOCTYPE html>
@@ -181,6 +194,11 @@ public class EmailService : IEmailService
         Guid? claimId = null,
         CancellationToken ct = default)
     {
+        fullName = Enc(fullName);
+        claimDescription = Enc(claimDescription);
+        approverName = string.IsNullOrWhiteSpace(approverName) ? null : Enc(approverName);
+        notes = string.IsNullOrWhiteSpace(notes) ? null : Enc(notes);
+
         var subject = newStatus switch
         {
             "Paid" => "[PayClaim] Pencairan Reimbursement: Klaim Masuk Payroll Selanjutnya",
@@ -324,6 +342,12 @@ public class EmailService : IEmailService
     {
         var subject = $"[PayClaim] Pengajuan Klaim Baru dari {employeeName} - Rp {amount:N0}";
         var claimUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/claims/{claimId}";
+        managerName = Enc(managerName);
+        employeeName = Enc(employeeName);
+        employeeNumber = Enc(employeeNumber);
+        departmentName = Enc(departmentName);
+        claimType = Enc(claimType);
+        claimDescription = Enc(claimDescription);
 
         var html = $@"
 <!DOCTYPE html>
@@ -425,6 +449,13 @@ public class EmailService : IEmailService
     {
         var subject = $"[PayClaim] Klaim Baru Masuk Antrean Finance: {employeeName} (Disetujui Manajer)";
         var claimUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/claims/{claimId}";
+        financeName = Enc(financeName);
+        employeeName = Enc(employeeName);
+        departmentName = Enc(departmentName);
+        claimType = Enc(claimType);
+        claimDescription = Enc(claimDescription);
+        managerName = Enc(managerName);
+        notes = string.IsNullOrWhiteSpace(notes) ? null : Enc(notes);
 
         var html = $@"
 <!DOCTYPE html>
@@ -526,6 +557,10 @@ public class EmailService : IEmailService
         CancellationToken ct = default)
     {
         var subject = $"[PayClaim] Pembaruan Status Proposal SPD ({destination}): {newStatus}";
+        picName = Enc(picName);
+        destination = Enc(destination);
+        approverName = string.IsNullOrWhiteSpace(approverName) ? null : Enc(approverName);
+        notes = string.IsNullOrWhiteSpace(notes) ? null : Enc(notes);
         var badgeColor = newStatus switch
         {
             "Approved" or "Completed" => "#16a34a",
@@ -582,6 +617,9 @@ public class EmailService : IEmailService
     {
         var subject = "[PayClaim] Pembaruan Kata Sandi Akun Anda";
         var loginUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/login";
+        fullName = Enc(fullName);
+        username = Enc(username);
+        newPassword = Enc(newPassword);
 
         var html = $@"
 <!DOCTYPE html>

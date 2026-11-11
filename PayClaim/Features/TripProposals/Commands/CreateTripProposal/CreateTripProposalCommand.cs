@@ -1,7 +1,9 @@
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
 using PayClaim.Common.Security;
 using PayClaim.Common.Services;
+using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.TripProposal;
 using PayClaim.Entities;
@@ -16,6 +18,7 @@ public record CreateTripProposalCommand(
 
 public class CreateTripProposalHandler(
     IUnitOfWork uow,
+    PayClaimDbContext context,
     IFileStorageService fileStorage,
     ICurrentUser currentUser,
     IHttpContextAccessor httpContextAccessor
@@ -96,15 +99,17 @@ public class CreateTripProposalHandler(
                 "Duplicate participant detected in proposal.");
         }
 
+        var participantIds = request.Participants.Select(p => p.EmployeeId).ToList();
+        var employeesById = await context.Employees
+            .AsNoTracking()
+            .Where(e => participantIds.Contains(e.Id))
+            .ToDictionaryAsync(e => e.Id, ct);
+
         var participantDtos = new List<ParticipantItemDto>();
 
         foreach (var p in request.Participants)
         {
-            var employee = await uow.Employees.GetByIdAsync(
-                new object[] { p.EmployeeId },
-                ct);
-
-            if (employee == null)
+            if (!employeesById.TryGetValue(p.EmployeeId, out var employee))
             {
                 throw new NotFoundException(
                     $"Employee with ID '{p.EmployeeId}' was not found.");

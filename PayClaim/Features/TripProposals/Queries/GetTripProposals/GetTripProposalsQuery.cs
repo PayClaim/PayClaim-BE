@@ -143,7 +143,8 @@ public class GetTripProposalsHandler(PayClaimDbContext context, ICurrentUser cur
                 Destination = tp.Destination,
                 StartDate = tp.StartDate,
                 EndDate = tp.EndDate,
-                TotalAmount = tp.TotalAmount,
+                TotalAmount = tp.TotalAmount +
+                    (tp.Participants.Sum(p => (decimal?)p.Amount) ?? 0m),
                 SubmittedAt = tp.SubmittedAt,
                 Status = tp.Status,
 

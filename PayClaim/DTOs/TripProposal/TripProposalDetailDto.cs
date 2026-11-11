@@ -31,4 +31,10 @@ public class TripProposalDetailDto
     public List<ParticipantItemDto> Participants { get; set; } = new();
 
     public List<TripApprovalHistoryDto> ApprovalHistory { get; set; } = new();
+
+    public decimal? MyParticipantAmount { get; set; }
+
+    public decimal? MyClaimedAmount { get; set; }
+
+    public decimal? MyRemainingBudget { get; set; }
 }

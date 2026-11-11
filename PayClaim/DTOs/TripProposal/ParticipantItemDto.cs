@@ -17,4 +17,8 @@ public class ParticipantItemDto
     // Saat Create, nilainya 0 karena akan ditentukan oleh Finance.
     [Range(0, double.MaxValue, ErrorMessage = "Amount cannot be negative.")]
     public decimal Amount { get; set; } = 0;
+
+    public decimal ClaimedAmount { get; set; } = 0;
+
+    public decimal RemainingBudget { get; set; } = 0;
 }

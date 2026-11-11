@@ -161,6 +161,35 @@ public class GetTripProposalByIdHandler(
                 $"Trip proposal with ID '{query.Id}' was not found.");
         }
 
+        // Hitung klaim yang sudah diajukan untuk proposal perjalanan dinas ini
+        var participantEmpIds = proposal.Participants.Select(p => p.EmployeeId).ToList();
+        var claimsByEmp = await context.Claims
+            .AsNoTracking()
+            .Where(c => c.TripProposalId == query.Id &&
+                        participantEmpIds.Contains(c.EmployeeId) &&
+                        c.Status != ClaimStatus.Rejected)
+            .GroupBy(c => c.EmployeeId)
+            .Select(g => new { EmployeeId = g.Key, TotalClaimed = g.Sum(c => c.Amount) })
+            .ToDictionaryAsync(x => x.EmployeeId, x => x.TotalClaimed, ct);
+
+        foreach (var p in proposal.Participants)
+        {
+            var claimed = claimsByEmp.TryGetValue(p.EmployeeId, out var sum) ? sum : 0m;
+            p.ClaimedAmount = claimed;
+            p.RemainingBudget = Math.Max(0m, p.Amount - claimed);
+        }
+
+        if (currentEmpId != Guid.Empty)
+        {
+            var myP = proposal.Participants.FirstOrDefault(p => p.EmployeeId == currentEmpId);
+            if (myP != null)
+            {
+                proposal.MyParticipantAmount = myP.Amount;
+                proposal.MyClaimedAmount = myP.ClaimedAmount;
+                proposal.MyRemainingBudget = myP.RemainingBudget;
+            }
+        }
+
         var approvalHistory = await context.TripApprovals
             .AsNoTracking()
             .Where(ta => ta.TripProposalId == query.Id)

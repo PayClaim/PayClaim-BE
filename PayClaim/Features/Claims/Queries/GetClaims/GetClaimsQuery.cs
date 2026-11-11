@@ -72,10 +72,25 @@ public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUse
             dbQuery = dbQuery.Where(c =>
                 (
                     isManager &&
-                    c.Employee.ManagerId == requesterEmployeeId
+                    (
+                        c.Employee.ManagerId == requesterEmployeeId ||
+                        context.ClaimApprovals.Any(ca =>
+                            ca.ClaimId == c.Id &&
+                            ca.ApproverId == requesterEmployeeId)
+                    )
                 )
                 ||
-                isFinance
+                (
+                    isFinance &&
+                    (
+                        c.Status == ClaimStatus.UnderReview ||
+                        c.Status == ClaimStatus.Approved ||
+                        c.Status == ClaimStatus.Paid ||
+                        context.ClaimApprovals.Any(ca =>
+                            ca.ClaimId == c.Id &&
+                            ca.ApprovalLevel >= 2)
+                    )
+                )
             );
         }
 

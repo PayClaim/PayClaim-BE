@@ -4,6 +4,7 @@ using PayClaim.Common.Exceptions;
 using PayClaim.Common.Security;
 using PayClaim.Data;
 using PayClaim.DTOs.Claim;
+using PayClaim.Enums;
 
 namespace PayClaim.Features.Claims.Queries.GetClaimById;
 
@@ -22,6 +23,7 @@ public class GetClaimByIdHandler(PayClaimDbContext context, ICurrentUser current
             .Select(c => new
             {
                 c.EmployeeId,
+                c.Status,
                 ManagerId = c.Employee.ManagerId
             })
             .FirstOrDefaultAsync(ct);
@@ -50,11 +52,26 @@ public class GetClaimByIdHandler(PayClaimDbContext context, ICurrentUser current
             employeeId.HasValue &&
             claimAccess.ManagerId == employeeId.Value;
 
+        var hasApproved = employeeId.HasValue &&
+            await context.ClaimApprovals
+                .AsNoTracking()
+                .AnyAsync(ca => ca.ClaimId == query.Id && ca.ApproverId == employeeId.Value, ct);
+
+        var isFinanceEligible = isFinance && (
+            claimAccess.Status == ClaimStatus.UnderReview ||
+            claimAccess.Status == ClaimStatus.Approved ||
+            claimAccess.Status == ClaimStatus.Paid ||
+            await context.ClaimApprovals
+                .AsNoTracking()
+                .AnyAsync(ca => ca.ClaimId == query.Id && ca.ApprovalLevel >= 2, ct)
+        );
+
         var hasAccess =
             isAdmin ||
-            isFinance ||
             isOwner ||
-            isManagerOfOwner;
+            isManagerOfOwner ||
+            hasApproved ||
+            isFinanceEligible;
 
         if (!hasAccess)
         {

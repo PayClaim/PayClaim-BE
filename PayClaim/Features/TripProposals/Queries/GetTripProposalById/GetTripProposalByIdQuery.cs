@@ -75,13 +75,22 @@ public class GetTripProposalByIdHandler(PayClaimDbContext context, ICurrentUser 
             .AsNoTracking()
             .AnyAsync(ta => ta.TripProposalId == query.Id && ta.ApproverId == currentEmpId, ct);
 
+        bool isFinanceEligible = (isFinance || isFinanceManager) && (
+            accessInfo.Status == TripProposalStatus.UnderReview ||
+            accessInfo.Status == TripProposalStatus.FinanceManagerReview ||
+            accessInfo.Status == TripProposalStatus.Approved ||
+            accessInfo.Status == TripProposalStatus.Completed ||
+            await context.TripApprovals
+                .AsNoTracking()
+                .AnyAsync(ta => ta.TripProposalId == query.Id && ta.ApprovalLevel >= 2, ct)
+        );
+
         bool hasAccess =
             isAdmin ||
             accessInfo.IsParticipant ||
             isDirectManager ||
             hasApproved ||
-            isFinance ||
-            isFinanceManager;
+            isFinanceEligible;
 
         if (!hasAccess)
         {

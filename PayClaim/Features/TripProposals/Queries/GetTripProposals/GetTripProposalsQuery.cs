@@ -77,12 +77,20 @@ public class GetTripProposalsHandler(PayClaimDbContext context, ICurrentUser cur
 
                 ||
 
-                // Finance dan Finance Manager melihat proposal
-                isFinance
-
-                ||
-
-                isFinanceManager
+                // Finance dan Finance Manager hanya melihat proposal yang perlu direview
+                // atau status setelah direview oleh finance
+                (
+                    (isFinance || isFinanceManager) &&
+                    (
+                        tp.Status == TripProposalStatus.UnderReview ||
+                        tp.Status == TripProposalStatus.FinanceManagerReview ||
+                        tp.Status == TripProposalStatus.Approved ||
+                        tp.Status == TripProposalStatus.Completed ||
+                        context.TripApprovals.Any(ta =>
+                            ta.TripProposalId == tp.Id &&
+                            ta.ApprovalLevel >= 2)
+                    )
+                )
             );
         }
 

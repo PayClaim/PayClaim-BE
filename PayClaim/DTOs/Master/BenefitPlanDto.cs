@@ -36,8 +36,14 @@ public class UpsertBenefitPlanDto
     public decimal LimitAmount { get; set; }
 }
 
-public class BenefitPlanFilterQuery : PaginationQuery
+public class BenefitPlanFilterQuery
 {
+    public int? PageNumber { get; set; }
+
+    public int? PageSize { get; set; }
+
+    public string? Search { get; set; }
+
     public string? DepartmentId { get; set; }
 
     public string? PositionId { get; set; }

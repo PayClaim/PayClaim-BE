@@ -96,8 +96,14 @@ public class UpdateEmployeeDto
     public bool IsActive { get; set; } = true;
 }
 
-public class EmployeeFilterQuery : PaginationQuery
+public class EmployeeFilterQuery
 {
+    public int? PageNumber { get; set; }
+
+    public int? PageSize { get; set; }
+
+    public string? Search { get; set; }
+
     public string? DepartmentId { get; set; }
 
     public string? PositionId { get; set; }

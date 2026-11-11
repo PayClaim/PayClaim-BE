@@ -25,4 +25,8 @@ public class TripProposalListDto
     public int ParticipantCount { get; set; }
 
     public string? FilePath { get; set; }
+
+    public decimal? MyParticipantAmount { get; set; }
+
+    public decimal? MyRemainingBudget { get; set; }
 }

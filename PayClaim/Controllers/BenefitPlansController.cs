@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PayClaim.DTOs.Common;
 using PayClaim.DTOs.Master;
 using PayClaim.Features.BenefitPlans.Commands;
 using PayClaim.Features.BenefitPlans.Queries;
@@ -13,9 +14,9 @@ public class BenefitPlansController(ISender sender) : ControllerBase
 {
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<ActionResult<List<BenefitPlanDto>>> GetAll(CancellationToken ct)
+    public async Task<ActionResult<PagedResponse<BenefitPlanDto>>> GetAll([FromQuery] BenefitPlanFilterQuery filter, CancellationToken ct)
     {
-        var result = await sender.Send(new GetBenefitPlansQuery(), ct);
+        var result = await sender.Send(new GetBenefitPlansQuery(filter), ct);
         return Ok(result);
     }
 

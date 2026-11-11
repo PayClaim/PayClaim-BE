@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PayClaim.DTOs.Common;
 using PayClaim.DTOs.Master;
 using PayClaim.Features.Employees.Commands.ActivateEmployee;
 using PayClaim.Features.Employees.Commands.CreateEmployee;
@@ -17,9 +18,9 @@ public class EmployeesController(ISender sender) : ControllerBase
 {
     [Authorize]
     [HttpGet]
-    public async Task<ActionResult<List<EmployeeDto>>> GetAll(CancellationToken ct)
+    public async Task<ActionResult<PagedResponse<EmployeeDto>>> GetAll([FromQuery] EmployeeFilterQuery filter, CancellationToken ct)
     {
-        var result = await sender.Send(new GetEmployeesQuery(), ct);
+        var result = await sender.Send(new GetEmployeesQuery(filter), ct);
         return Ok(result);
     }
 

@@ -158,9 +158,38 @@ public class GetTripProposalsHandler(PayClaimDbContext context, ICurrentUser cur
                     .FirstOrDefault(),
 
                 ParticipantCount = tp.Participants.Count,
-                FilePath = tp.FilePath
+                FilePath = tp.FilePath,
+
+                MyParticipantAmount = employeeId.HasValue
+                    ? tp.Participants
+                        .Where(p => p.EmployeeId == employeeId.Value)
+                        .Select(p => (decimal?)p.Amount)
+                        .FirstOrDefault()
+                    : null
             })
             .ToListAsync(ct);
+
+        if (employeeId.HasValue && items.Count > 0)
+        {
+            var tripIds = items.Select(i => i.Id).ToList();
+            var claimedByTrip = await context.Claims
+                .Where(c => c.TripProposalId.HasValue &&
+                            tripIds.Contains(c.TripProposalId.Value) &&
+                            c.EmployeeId == employeeId.Value &&
+                            c.Status != ClaimStatus.Rejected)
+                .GroupBy(c => c.TripProposalId!.Value)
+                .Select(g => new { TripId = g.Key, TotalClaimed = g.Sum(c => c.Amount) })
+                .ToDictionaryAsync(x => x.TripId, x => x.TotalClaimed, ct);
+
+            foreach (var item in items)
+            {
+                if (item.MyParticipantAmount.HasValue)
+                {
+                    var claimed = claimedByTrip.TryGetValue(item.Id, out var sum) ? sum : 0m;
+                    item.MyRemainingBudget = Math.Max(0m, item.MyParticipantAmount.Value - claimed);
+                }
+            }
+        }
 
         return new PagedResponse<TripProposalListDto>(
             items,

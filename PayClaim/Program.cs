@@ -34,7 +34,8 @@ try
         {
             policy.AllowAnyOrigin()
                   .AllowAnyMethod()
-                  .AllowAnyHeader();
+                  .AllowAnyHeader()
+                  .SetPreflightMaxAge(TimeSpan.FromHours(1));
         });
     });
 

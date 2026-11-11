@@ -154,9 +154,17 @@ public class ApproveClaimHandler(
                     $"Cannot approve claim: Insufficient benefit quota balance. Available balance is Rp {empBenefit.Balance:N0}, but claim amount requested is Rp {claim.Amount:N0}.");
             }
 
-            empBenefit.Balance -= claim.Amount;
+            var updatedRows = await context.EmployeeBenefits
+                .Where(eb => eb.Id == claim.EmployeeBenefitId.Value && eb.Balance >= claim.Amount)
+                .ExecuteUpdateAsync(
+                    s => s.SetProperty(eb => eb.Balance, eb => eb.Balance - claim.Amount),
+                    ct);
 
-            uow.EmployeeBenefits.Update(empBenefit);
+            if (updatedRows == 0)
+            {
+                throw new BusinessRuleException(
+                    $"Cannot approve claim: Insufficient benefit quota balance due to concurrent update.");
+            }
         }
 
         // 7. Update status Claim
@@ -213,9 +221,8 @@ public class ApproveClaimHandler(
                 .Distinct()
                 .ToListAsync(ct);
 
-            foreach (var fin in financeUsers)
-            {
-                await emailService.SendClaimApprovedToFinanceEmailAsync(
+            await Task.WhenAll(financeUsers.Select(fin =>
+                emailService.SendClaimApprovedToFinanceEmailAsync(
                     fin.Email,
                     fin.FullName,
                     claimantEmp?.FullName ?? "Karyawan",
@@ -226,8 +233,7 @@ public class ApproveClaimHandler(
                     approver.FullName,
                     command.Request.Notes,
                     claim.Id,
-                    ct);
-            }
+                    ct)));
         }
 
         return new ClaimApprovalHistoryDto

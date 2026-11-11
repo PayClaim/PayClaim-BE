@@ -33,6 +33,11 @@ public class FileStorageService : IFileStorageService
             throw new BusinessRuleException($"File format '{extension}' is not allowed. Allowed formats: {string.Join(", ", AllowedExtensions)}");
         }
 
+        if (!await HasValidSignatureAsync(file, extension, ct))
+        {
+            throw new BusinessRuleException($"File content does not match the '{extension}' file signature.");
+        }
+
         var webRoot = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
         var targetFolder = Path.Combine(webRoot, "uploads", subFolder);
 
@@ -64,5 +69,23 @@ public class FileStorageService : IFileStorageService
         {
             File.Delete(fullPath);
         }
+    }
+
+    private static async Task<bool> HasValidSignatureAsync(IFormFile file, string extension, CancellationToken ct)
+    {
+        var header = new byte[12];
+        await using var stream = file.OpenReadStream();
+        var bytesRead = await stream.ReadAsync(header.AsMemory(0, header.Length), ct);
+        if (bytesRead < 4) return false;
+
+        return extension switch
+        {
+            ".pdf" => header[0] == 0x25 && header[1] == 0x50 && header[2] == 0x44 && header[3] == 0x46, // %PDF
+            ".jpg" or ".jpeg" => header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF,
+            ".png" => bytesRead >= 8 && header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47,
+            ".webp" => bytesRead >= 12 && header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46
+                                       && header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50,
+            _ => false
+        };
     }
 }

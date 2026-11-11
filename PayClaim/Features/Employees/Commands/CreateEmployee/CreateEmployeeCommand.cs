@@ -1,5 +1,7 @@
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
 using PayClaim.Entities;
@@ -11,7 +13,10 @@ namespace PayClaim.Features.Employees.Commands.CreateEmployee;
 
 public record CreateEmployeeCommand(CreateEmployeeDto Request) : IRequest<Guid>;
 
-public class CreateEmployeeHandler(IUnitOfWork uow, PayClaim.Common.Services.IEmailService emailService) : IRequestHandler<CreateEmployeeCommand, Guid>
+public class CreateEmployeeHandler(
+    IUnitOfWork uow,
+    PayClaimDbContext context,
+    PayClaim.Common.Services.IEmailService emailService) : IRequestHandler<CreateEmployeeCommand, Guid>
 {
     public async Task<Guid> Handle(
         CreateEmployeeCommand command,
@@ -86,17 +91,11 @@ public class CreateEmployeeHandler(IUnitOfWork uow, PayClaim.Common.Services.IEm
             roleNames.Add("Finance");
         }
 
-        var roleIds = new List<Guid>();
-
-        foreach (var name in roleNames)
-        {
-            var role = await uow.Roles.GetByNameAsync(name, ct);
-
-            if (role != null)
-            {
-                roleIds.Add(role.Id);
-            }
-        }
+        var roleIds = await context.Roles
+            .AsNoTracking()
+            .Where(r => roleNames.Contains(r.Name))
+            .Select(r => r.Id)
+            .ToListAsync(ct);
 
         var benefitPlans = await uow.BenefitPlans.GetByDepartmentAndPositionAsync(request.DepartmentId, request.PositionId, ct);
 
@@ -104,7 +103,7 @@ public class CreateEmployeeHandler(IUnitOfWork uow, PayClaim.Common.Services.IEm
 
         foreach (var plan in benefitPlans)
         {
-            var benefit = await uow.Benefits.GetByIdAsync(new object[] { plan.BenefitId }, ct);
+            var benefit = plan.Benefit ?? await uow.Benefits.GetByIdAsync(new object[] { plan.BenefitId }, ct);
 
             if (benefit == null)
             {

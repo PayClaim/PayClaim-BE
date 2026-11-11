@@ -8,6 +8,7 @@ using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Claim;
 using PayClaim.Entities;
 using PayClaim.Enums;
+using PayClaim.Features.EmployeeBenefits;
 
 namespace PayClaim.Features.Claims.Commands.CreateClaim;
 
@@ -95,6 +96,20 @@ public class CreateClaimHandler(
                         "The selected benefit quota does not belong to this employee.");
                 }
 
+                // Cek dan lakukan auto-renewal jika periode benefit sudah kadaluarsa
+                var plan = await context.BenefitPlans
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(bp =>
+                        bp.DepartmentId == employee.DepartmentId &&
+                        bp.PositionId == employee.PositionId &&
+                        bp.BenefitId == empBenefit.BenefitId, ct);
+
+                if (plan != null && BenefitPeriodHelper.TryRenewIfExpired(empBenefit, empBenefit.Benefit.PeriodType, plan.LimitAmount))
+                {
+                    uow.EmployeeBenefits.Update(empBenefit);
+                    await uow.SaveChangesAsync(ct);
+                }
+
                 // Pastikan tanggal transaksi masuk periode Benefit
                 if (request.TransactionDate < empBenefit.StartDate ||
                     request.TransactionDate > empBenefit.EndDate)
@@ -103,11 +118,19 @@ public class CreateClaimHandler(
                         $"Transaction date must be within the active benefit quota period ({empBenefit.StartDate:yyyy-MM-dd} to {empBenefit.EndDate:yyyy-MM-dd}).");
                 }
 
-                // Pastikan saldo mencukupi
-                if (empBenefit.Balance < request.Amount)
+                // Hitung klaim benefit yang sedang berjalan (Submitted / UnderReview / Approved)
+                var pendingBenefitClaims = await context.Claims
+                    .Where(c => c.EmployeeBenefitId == empBenefit.Id &&
+                                c.EmployeeId == employee.Id &&
+                                c.Status != ClaimStatus.Rejected &&
+                                c.Status != ClaimStatus.Paid)
+                    .SumAsync(c => c.Amount, ct);
+
+                var availableBalance = Math.Max(0, empBenefit.Balance - pendingBenefitClaims);
+                if (availableBalance < request.Amount)
                 {
                     throw new BusinessRuleException(
-                        $"Insufficient benefit quota balance. Current balance is Rp {empBenefit.Balance:N0}, but claim amount requested is Rp {request.Amount:N0}.");
+                        $"Insufficient benefit quota balance. Current available balance is Rp {availableBalance:N0} (Active balance: Rp {empBenefit.Balance:N0}, Pending claims: Rp {pendingBenefitClaims:N0}), but claim amount requested is Rp {request.Amount:N0}.");
                 }
 
                 benefitName = empBenefit.Benefit?.Name;

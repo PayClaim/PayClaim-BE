@@ -12,7 +12,13 @@ public class TripProposalDetailDto
 
     public DateOnly EndDate { get; set; }
 
+    // Biaya akomodasi yang tersimpan di kolom TotalAmount Entity.
+    public decimal AccommodationAmount { get; set; }
+
+    // Total biaya akomodasi + limit seluruh peserta.
     public decimal TotalAmount { get; set; }
+
+    public decimal FinanceLimit { get; set; }
 
     public DateTime SubmittedAt { get; set; }
 

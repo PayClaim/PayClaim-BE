@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using PayClaim.Common.Constants;
 using PayClaim.Common.Exceptions;
 using PayClaim.Common.Security;
 using PayClaim.Data;
@@ -11,9 +12,13 @@ namespace PayClaim.Features.TripProposals.Queries.GetTripProposalById;
 public record GetTripProposalByIdQuery(
     Guid Id,
     Guid? EmployeeId = null,
-    string[]? Roles = null) : IRequest<TripProposalDetailDto>;
+    string[]? Roles = null
+) : IRequest<TripProposalDetailDto>;
 
-public class GetTripProposalByIdHandler(PayClaimDbContext context, ICurrentUser currentUser) : IRequestHandler<GetTripProposalByIdQuery, TripProposalDetailDto>
+public class GetTripProposalByIdHandler(
+    PayClaimDbContext context,
+    ICurrentUser currentUser
+) : IRequestHandler<GetTripProposalByIdQuery, TripProposalDetailDto>
 {
     public async Task<TripProposalDetailDto> Handle(
         GetTripProposalByIdQuery query,
@@ -23,16 +28,20 @@ public class GetTripProposalByIdHandler(PayClaimDbContext context, ICurrentUser 
         var employeeId = query.EmployeeId ?? currentUser.EmployeeId;
 
         bool isAdmin = roles.Contains(
-            "Admin", StringComparer.OrdinalIgnoreCase);
+            "Admin",
+            StringComparer.OrdinalIgnoreCase);
 
         bool isManager = roles.Contains(
-            "Manager", StringComparer.OrdinalIgnoreCase);
+            "Manager",
+            StringComparer.OrdinalIgnoreCase);
 
         bool isFinance = roles.Contains(
-            "Finance", StringComparer.OrdinalIgnoreCase);
+            "Finance",
+            StringComparer.OrdinalIgnoreCase);
 
         bool isFinanceManager = roles.Contains(
-            "Finance Manager", StringComparer.OrdinalIgnoreCase);
+            "Finance Manager",
+            StringComparer.OrdinalIgnoreCase);
 
         if (!isAdmin &&
             (!employeeId.HasValue ||
@@ -51,6 +60,7 @@ public class GetTripProposalByIdHandler(PayClaimDbContext context, ICurrentUser 
             {
                 tp.Status,
 
+                // Semua peserta boleh melihat proposal, bukan PIC saja.
                 IsParticipant = tp.Participants.Any(p =>
                     p.EmployeeId == currentEmpId),
 
@@ -73,17 +83,27 @@ public class GetTripProposalByIdHandler(PayClaimDbContext context, ICurrentUser 
 
         bool hasApproved = await context.TripApprovals
             .AsNoTracking()
-            .AnyAsync(ta => ta.TripProposalId == query.Id && ta.ApproverId == currentEmpId, ct);
+            .AnyAsync(
+                ta =>
+                    ta.TripProposalId == query.Id &&
+                    ta.ApproverId == currentEmpId,
+                ct);
 
-        bool isFinanceEligible = (isFinance || isFinanceManager) && (
-            accessInfo.Status == TripProposalStatus.UnderReview ||
-            accessInfo.Status == TripProposalStatus.FinanceManagerReview ||
-            accessInfo.Status == TripProposalStatus.Approved ||
-            accessInfo.Status == TripProposalStatus.Completed ||
-            await context.TripApprovals
-                .AsNoTracking()
-                .AnyAsync(ta => ta.TripProposalId == query.Id && ta.ApprovalLevel >= 2, ct)
-        );
+        bool isFinanceEligible =
+            (isFinance || isFinanceManager) &&
+            (
+                accessInfo.Status == TripProposalStatus.UnderReview ||
+                accessInfo.Status == TripProposalStatus.FinanceManagerReview ||
+                accessInfo.Status == TripProposalStatus.Approved ||
+                accessInfo.Status == TripProposalStatus.Completed ||
+                await context.TripApprovals
+                    .AsNoTracking()
+                    .AnyAsync(
+                        ta =>
+                            ta.TripProposalId == query.Id &&
+                            ta.ApprovalLevel >= 2,
+                        ct)
+            );
 
         bool hasAccess =
             isAdmin ||
@@ -107,7 +127,16 @@ public class GetTripProposalByIdHandler(PayClaimDbContext context, ICurrentUser 
                 Destination = tp.Destination,
                 StartDate = tp.StartDate,
                 EndDate = tp.EndDate,
-                TotalAmount = tp.TotalAmount,
+
+                // Kolom TotalAmount Entity masih menyimpan biaya akomodasi.
+                AccommodationAmount = tp.TotalAmount,
+
+                // Total response = akomodasi + limit seluruh peserta.
+                TotalAmount = tp.TotalAmount +
+                        (tp.Participants.Sum(p => (decimal?)p.Amount) ?? 0m),
+
+                FinanceLimit = TripProposalApprovalLimit.FinanceLimit,
+
                 SubmittedAt = tp.SubmittedAt,
                 Description = tp.Description,
                 Status = tp.Status,

@@ -12,7 +12,6 @@ public class TripApprovalActionDto
     [StringLength(500, ErrorMessage = "Notes cannot exceed 500 characters.")]
     public string? Notes { get; set; }
 
-    public decimal? TotalAmount { get; set; }
-
+    // Digunakan Finance untuk menentukan limit reimbursement setiap peserta.
     public List<ParticipantItemDto>? Participants { get; set; }
 }

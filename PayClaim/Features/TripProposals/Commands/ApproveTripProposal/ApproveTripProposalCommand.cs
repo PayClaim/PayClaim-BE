@@ -16,26 +16,32 @@ public record ApproveTripProposalCommand(
     Guid ProposalId,
     TripApprovalActionDto Request,
     Guid? LoggedInApproverId = null,
-    string[]? ApproverRoles = null) : IRequest<TripApprovalHistoryDto>;
+    string[]? ApproverRoles = null
+) : IRequest<TripApprovalHistoryDto>;
 
 public class ApproveTripProposalHandler(
     IUnitOfWork uow,
     PayClaimDbContext context,
     IEmailService emailService,
-    ICurrentUser currentUser) : IRequestHandler<ApproveTripProposalCommand, TripApprovalHistoryDto>
+    ICurrentUser currentUser
+) : IRequestHandler<ApproveTripProposalCommand, TripApprovalHistoryDto>
 {
     public async Task<TripApprovalHistoryDto> Handle(
         ApproveTripProposalCommand command,
         CancellationToken ct = default)
     {
-        var approverId = command.LoggedInApproverId ?? currentUser.RequiredEmployeeId;
-        var approverRoles = command.ApproverRoles ?? currentUser.Roles;
+        var approverId =
+            command.LoggedInApproverId ?? currentUser.RequiredEmployeeId;
+
+        var approverRoles =
+            command.ApproverRoles ?? currentUser.Roles;
 
         var proposal = await context.TripProposals
             .Include(tp => tp.Participants)
                 .ThenInclude(p => p.Employee)
             .FirstOrDefaultAsync(
-                tp => tp.Id == command.ProposalId, ct);
+                tp => tp.Id == command.ProposalId,
+                ct);
 
         if (proposal == null)
         {
@@ -46,7 +52,8 @@ public class ApproveTripProposalHandler(
         var approver = await context.Employees
             .AsNoTracking()
             .FirstOrDefaultAsync(
-                e => e.Id == approverId, ct);
+                e => e.Id == approverId,
+                ct);
 
         if (approver == null)
         {
@@ -76,24 +83,31 @@ public class ApproveTripProposalHandler(
         }
 
         bool hasManagerRole = approverRoles.Contains(
-            "Manager", StringComparer.OrdinalIgnoreCase);
+            "Manager",
+            StringComparer.OrdinalIgnoreCase);
 
         bool hasFinanceRole = approverRoles.Contains(
-            "Finance", StringComparer.OrdinalIgnoreCase);
+            "Finance",
+            StringComparer.OrdinalIgnoreCase);
 
         bool hasFinanceManagerRole = approverRoles.Contains(
-            "Finance Manager", StringComparer.OrdinalIgnoreCase);
+            "Finance Manager",
+            StringComparer.OrdinalIgnoreCase);
 
         bool hasAdminRole = approverRoles.Contains(
-            "Admin", StringComparer.OrdinalIgnoreCase);
+            "Admin",
+            StringComparer.OrdinalIgnoreCase);
 
         byte currentLevel;
         TripProposalStatus nextStatus;
-        TripApprovalDecision recordedDecision = command.Request.Decision;
 
+        TripApprovalDecision recordedDecision =
+            command.Request.Decision;
+
+        // LEVEL 1: MANAGER
         if (proposal.Status == TripProposalStatus.Submitted)
         {
-            if (!hasManagerRole && !hasFinanceManagerRole && !hasAdminRole)
+            if (!hasManagerRole && !hasAdminRole)
             {
                 throw new ForbiddenException(
                     "Only Manager or Admin can approve this trip proposal.");
@@ -131,9 +145,11 @@ public class ApproveTripProposalHandler(
                     "Invalid approval decision.")
             };
         }
+
+        // LEVEL 2: FINANCE
         else if (proposal.Status == TripProposalStatus.UnderReview)
         {
-            if (!hasFinanceRole && !hasFinanceManagerRole && !hasAdminRole)
+            if (!hasFinanceRole && !hasAdminRole)
             {
                 throw new ForbiddenException(
                     "Only Finance or Admin can process this trip proposal.");
@@ -143,45 +159,65 @@ public class ApproveTripProposalHandler(
 
             if (command.Request.Decision == TripApprovalDecision.Approved)
             {
-                if (command.Request.TotalAmount.HasValue)
+                var requestedParticipants = command.Request.Participants;
+
+                // Finance must provide limits for all participants.
+                if (requestedParticipants == null ||
+                    requestedParticipants.Count != proposal.Participants.Count)
                 {
-                    if (command.Request.TotalAmount.Value <= 0)
+                    throw new BusinessRuleException(
+                        "Finance must provide reimbursement limits for all participants.");
+                }
+
+                // Prevent duplicate Employee IDs.
+                var duplicateEmployees = requestedParticipants
+                    .GroupBy(p => p.EmployeeId)
+                    .Where(g => g.Count() > 1)
+                    .Select(g => g.Key)
+                    .ToList();
+
+                if (duplicateEmployees.Count > 0)
+                {
+                    throw new BusinessRuleException(
+                        "Duplicate participant detected in approval request.");
+                }
+
+                // Save the reimbursement limit for each participant.
+                foreach (var participantDto in requestedParticipants)
+                {
+                    if (participantDto.Amount <= 0)
                     {
                         throw new BusinessRuleException(
-                            "Total amount must be greater than zero.");
+                            "Participant reimbursement limit must be greater than zero.");
                     }
 
-                    proposal.TotalAmount =
-                        command.Request.TotalAmount.Value;
-                }
+                    var participant = proposal.Participants
+                        .FirstOrDefault(
+                            p => p.EmployeeId == participantDto.EmployeeId);
 
-                if (command.Request.Participants != null &&
-                    command.Request.Participants.Count > 0)
-                {
-                    foreach (var partDto in command.Request.Participants)
+                    if (participant == null)
                     {
-                        if (partDto.Amount < 0)
-                        {
-                            throw new BusinessRuleException(
-                                "Participant amount cannot be negative.");
-                        }
-
-                        var participant = proposal.Participants
-                            .FirstOrDefault(
-                                p => p.EmployeeId == partDto.EmployeeId);
-
-                        if (participant == null)
-                        {
-                            throw new BusinessRuleException(
-                                $"Employee '{partDto.EmployeeId}' is not a participant of this proposal.");
-                        }
-
-                        participant.Amount = partDto.Amount;
+                        throw new BusinessRuleException(
+                            $"Employee '{participantDto.EmployeeId}' is not a participant of this proposal.");
                     }
+
+                    // This limit applies to the entire trip, not per day.
+                    participant.Amount = participantDto.Amount;
                 }
 
-                if (proposal.TotalAmount >
-                    TripProposalApprovalLimit.FinanceLimit)
+                // Total reimbursement limits for all participants.
+                decimal participantTotal = proposal.Participants
+                    .Sum(p => p.Amount);
+
+                // Entity TotalAmount still stores accommodation only.
+                decimal proposedTotalAmount =
+                    proposal.TotalAmount + participantTotal;
+
+                // FinanceLimit applies to the entire proposal.
+                bool exceedsFinanceLimit =
+                    proposedTotalAmount > TripProposalApprovalLimit.FinanceLimit;
+
+                if (exceedsFinanceLimit)
                 {
                     nextStatus =
                         TripProposalStatus.FinanceManagerReview;
@@ -209,6 +245,8 @@ public class ApproveTripProposalHandler(
                 };
             }
         }
+
+        // LEVEL 3: FINANCE MANAGER
         else if (proposal.Status ==
                  TripProposalStatus.FinanceManagerReview)
         {
@@ -257,16 +295,24 @@ public class ApproveTripProposalHandler(
         };
 
         await uow.TripApprovals.AddAsync(
-            approvalRecord, ct);
+            approvalRecord,
+            ct);
 
         await uow.SaveChangesAsync(ct);
 
-        // Kirim notifikasi email ke PIC Proposal Perjalanan Dinas
-        var picParticipant = proposal.Participants.FirstOrDefault(p => p.IsPic) ?? proposal.Participants.FirstOrDefault();
+        // Send a status notification email to the proposal PIC.
+        var picParticipant = proposal.Participants
+            .FirstOrDefault(p => p.IsPic)
+            ?? proposal.Participants.FirstOrDefault();
+
         if (picParticipant != null)
         {
-            var picEmp = await uow.Employees.GetByIdAsync(new object[] { picParticipant.EmployeeId }, ct);
-            if (picEmp != null && !string.IsNullOrWhiteSpace(picEmp.Email))
+            var picEmp = await uow.Employees.GetByIdAsync(
+                new object[] { picParticipant.EmployeeId },
+                ct);
+
+            if (picEmp != null &&
+                !string.IsNullOrWhiteSpace(picEmp.Email))
             {
                 await emailService.SendTripProposalStatusEmailAsync(
                     picEmp.Email,

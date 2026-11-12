@@ -155,7 +155,7 @@ public class RejectClaimHandler(
             Decision = decision,
             Notes = command.Request.Notes,
             ApprovalLevel = currentLevel,
-            DecidedAt = DateTime.UtcNow
+            DecidedAt = DateTime.UtcNow.AddHours(7)
         };
 
         await uow.ClaimApprovals.AddAsync(

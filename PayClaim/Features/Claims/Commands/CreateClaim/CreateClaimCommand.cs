@@ -234,7 +234,7 @@ public class CreateClaimHandler(
             Description = request.Description,
             TransactionDate = request.TransactionDate,
             Amount = request.Amount,
-            SubmittedAt = DateTime.UtcNow,
+            SubmittedAt = DateTime.UtcNow.AddHours(7),
             Status = ClaimStatus.Submitted,
             FilePath = filePath,
 

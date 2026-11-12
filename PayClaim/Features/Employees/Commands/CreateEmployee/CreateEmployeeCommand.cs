@@ -24,7 +24,7 @@ public class CreateEmployeeHandler(
     {
         var request = command.Request;
 
-        var year = DateTime.UtcNow.Year;
+        var year = DateTime.UtcNow.AddHours(7).Year;
         string employeeNumber;
 
         do
@@ -159,7 +159,7 @@ public class CreateEmployeeHandler(
             {
                 AccountId = account.Id,
                 RoleId = roleId,
-                AssignedAt = DateTime.UtcNow
+                AssignedAt = DateTime.UtcNow.AddHours(7)
             });
         }
 

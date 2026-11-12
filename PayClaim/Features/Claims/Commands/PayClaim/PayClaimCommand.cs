@@ -61,7 +61,7 @@ public class PayClaimHandler(
             Decision = ApprovalDecision.Approved,
             Notes = command.Notes ?? "Dana reimburse berhasil dicairkan dan dimasukkan ke dalam payroll selanjutnya.",
             ApprovalLevel = 3, 
-            DecidedAt = DateTime.UtcNow
+            DecidedAt = DateTime.UtcNow.AddHours(7)
         };
 
         await uow.ClaimApprovals.AddAsync(approvalRecord, ct);

@@ -126,6 +126,9 @@ public class UpdateTripProposalHandler(
             }
         }
 
+        // Perbarui waktu submission ketika proposal diajukan ulang.
+        proposal.SubmittedAt = DateTime.UtcNow.AddHours(7);
+
         proposal.Status = TripProposalStatus.Submitted;
 
         uow.TripProposals.Update(proposal);

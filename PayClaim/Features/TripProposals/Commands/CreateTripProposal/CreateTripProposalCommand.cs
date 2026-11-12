@@ -148,7 +148,7 @@ public class CreateTripProposalHandler(
             TotalAmount = request.TotalAmount,
 
             Description = request.Description,
-            SubmittedAt = DateTime.UtcNow,
+            SubmittedAt = DateTime.UtcNow.AddHours(7),
             Status = TripProposalStatus.Submitted,
             FilePath = filePath
         };

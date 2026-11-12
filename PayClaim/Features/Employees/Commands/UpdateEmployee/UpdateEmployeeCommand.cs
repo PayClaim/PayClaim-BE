@@ -114,7 +114,7 @@ public class UpdateEmployeeHandler(IUnitOfWork uow) : IRequestHandler<UpdateEmpl
                     {
                         AccountId = account.Id,
                         RoleId = role.Id,
-                        AssignedAt = DateTime.UtcNow
+                        AssignedAt = DateTime.UtcNow.AddHours(7)
                     }, ct);
                 }
             }

@@ -82,6 +82,9 @@ public class CompleteTripProposalHandler(
 
         proposal.Status = TripProposalStatus.Completed;
 
+        var directManager = await context.GetDirectManagerAsync(
+            pic.EmployeeId, ct);
+
         uow.TripProposals.Update(proposal);
 
         await uow.SaveChangesAsync(ct);
@@ -99,8 +102,7 @@ public class CompleteTripProposalHandler(
             .ToList();
 
         await Task.WhenAll(recipients.Select(r =>
-            emailService.SendTripProposalStatusEmailAsync(
-                r.Email,
+            emailService.SendTripProposalStatusEmailAsync(                r.Email,
                 r.Name,
                 proposal.Destination,
                 "Completed",
@@ -138,6 +140,7 @@ public class CompleteTripProposalHandler(
             Description = proposal.Description,
             Status = proposal.Status,
             FilePath = proposal.FilePath,
+            ManagerName = directManager?.Name,
 
             Participants = proposal.Participants.Select(p =>
                 new ParticipantItemDto

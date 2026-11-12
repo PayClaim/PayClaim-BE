@@ -142,6 +142,15 @@ public class GetTripProposalByIdHandler(
                 Status = tp.Status,
                 FilePath = tp.FilePath,
 
+                // Nama atasan langsung PIC, dipakai sebagai fallback pada
+                // kartu approval Manager di halaman detail.
+                ManagerName = tp.Participants
+                    .Where(p => p.IsPic)
+                    .Select(p => p.Employee.Manager != null
+                        ? p.Employee.Manager.FullName
+                        : null)
+                    .FirstOrDefault(),
+
                 Participants = tp.Participants
                     .Select(p => new ParticipantItemDto
                     {

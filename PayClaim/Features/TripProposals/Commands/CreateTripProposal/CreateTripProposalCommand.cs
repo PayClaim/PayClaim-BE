@@ -181,6 +181,7 @@ public class CreateTripProposalHandler(
         // Notifikasi email ke approver pertama.
         // Jika pengaju Manager, tahap Manager dilewati -> langsung ke Finance.
         var submitterName = submitterEmployee?.FullName ?? "PIC";
+        var directManager = await context.GetDirectManagerAsync(submitterId, ct);
 
         if (submittedByManager)
         {
@@ -205,9 +206,6 @@ public class CreateTripProposalHandler(
         }
         else
         {
-            var directManager = await context.GetDirectManagerAsync(
-                submitterId, ct);
-
             if (directManager != null)
             {
                 await emailService.SendTripProposalActionRequiredEmailAsync(
@@ -244,6 +242,7 @@ public class CreateTripProposalHandler(
             Description = proposal.Description,
             Status = proposal.Status,
             FilePath = proposal.FilePath,
+            ManagerName = directManager?.Name,
             Participants = participantDtos,
             ApprovalHistory = new List<TripApprovalHistoryDto>()
         };

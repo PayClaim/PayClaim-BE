@@ -138,6 +138,8 @@ public class UpdateTripProposalHandler(
         var picName = currentPic.Employee?.FullName ?? "PIC";
         var proposalTotal = proposal.TotalAmount +
             proposal.Participants.Sum(p => p.Amount);
+        var directManager = await context.GetDirectManagerAsync(
+            currentPic.EmployeeId, ct);
 
         if (picIsManager)
         {
@@ -162,9 +164,6 @@ public class UpdateTripProposalHandler(
         }
         else
         {
-            var directManager = await context.GetDirectManagerAsync(
-                currentPic.EmployeeId, ct);
-
             if (directManager != null)
             {
                 await emailService.SendTripProposalActionRequiredEmailAsync(
@@ -208,6 +207,7 @@ public class UpdateTripProposalHandler(
             Description = proposal.Description,
             Status = proposal.Status,
             FilePath = proposal.FilePath,
+            ManagerName = directManager?.Name,
             Participants = proposal.Participants.Select(p => new ParticipantItemDto
             {
                 EmployeeId = p.EmployeeId,

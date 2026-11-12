@@ -18,6 +18,7 @@ public class UpdateClaimHandler(
     IUnitOfWork uow,
     PayClaimDbContext context,
     IFileStorageService fileStorage,
+    IEmailService emailService,
     ICurrentUser currentUser) : IRequestHandler<UpdateClaimCommand, ClaimDetailDto>
 {
     public async Task<ClaimDetailDto> Handle(UpdateClaimCommand command, CancellationToken ct = default)
@@ -188,16 +189,67 @@ public class UpdateClaimHandler(
             claim.FilePath = await fileStorage.SaveFileAsync(request.ReceiptFile, "receipts", ct);
         }
 
-        // 6. Update properti klaim & kembalikan status ke Submitted (Resubmitted)
+        // 6. Update properti klaim & kembalikan status ke Submitted (Resubmitted).
+        // Jika pengaju adalah Manager, tahap Manager tetap dilewati.
         claim.ClaimType = request.ClaimType;
         claim.Description = request.Description;
         claim.TransactionDate = request.TransactionDate;
         claim.Amount = request.Amount;
-        claim.Status = ClaimStatus.Submitted;
+
+        var claimantIsManager = await context.HasRoleAsync(
+            claim.EmployeeId, "Manager", ct);
+
+        claim.Status = claimantIsManager
+            ? ClaimStatus.UnderReview
+            : ClaimStatus.Submitted;
         claim.SubmittedAt = DateTime.UtcNow;
 
         uow.Claims.Update(claim);
         await uow.SaveChangesAsync(ct);
+
+        // 6b. Notifikasi email ke approver berikutnya setelah revisi.
+        if (claimantIsManager)
+        {
+            var financeUsers = (await context.GetActiveByRolesAsync(ct, "Finance"))
+                .Where(f => !string.Equals(
+                    f.Email, claim.Employee.Email, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            await Task.WhenAll(financeUsers.Select(fin =>
+                emailService.SendClaimSubmittedToFinanceEmailAsync(
+                    fin.Email,
+                    fin.Name,
+                    claim.Employee.FullName,
+                    claim.Employee.Number,
+                    claim.Employee.Department?.Name ?? "-",
+                    claim.ClaimType.ToString(),
+                    claim.Description,
+                    claim.Amount,
+                    claim.SubmittedAt,
+                    claim.Id,
+                    ct)));
+        }
+        else
+        {
+            var directManager = await context.GetDirectManagerAsync(
+                claim.EmployeeId, ct);
+
+            if (directManager != null)
+            {
+                await emailService.SendClaimSubmittedToManagerEmailAsync(
+                    directManager.Email,
+                    directManager.Name,
+                    claim.Employee.FullName,
+                    claim.Employee.Number,
+                    claim.Employee.Department?.Name ?? "-",
+                    claim.ClaimType.ToString(),
+                    claim.Description,
+                    claim.Amount,
+                    claim.SubmittedAt,
+                    claim.Id,
+                    ct);
+            }
+        }
 
         // 7. Ambil riwayat approval untuk detail DTO
         var approvalHistory = await context.ClaimApprovals

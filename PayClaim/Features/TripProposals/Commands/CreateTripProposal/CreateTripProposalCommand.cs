@@ -20,6 +20,7 @@ public class CreateTripProposalHandler(
     IUnitOfWork uow,
     PayClaimDbContext context,
     IFileStorageService fileStorage,
+    IEmailService emailService,
     ICurrentUser currentUser,
     IHttpContextAccessor httpContextAccessor
 ) : IRequestHandler<CreateTripProposalCommand, TripProposalDetailDto>
@@ -176,6 +177,53 @@ public class CreateTripProposalHandler(
 
         await uow.TripProposals.AddAsync(proposal, ct);
         await uow.SaveChangesAsync(ct);
+
+        // Notifikasi email ke approver pertama.
+        // Jika pengaju Manager, tahap Manager dilewati -> langsung ke Finance.
+        var submitterName = submitterEmployee?.FullName ?? "PIC";
+
+        if (submittedByManager)
+        {
+            var financeUsers = (await context.GetActiveByRolesAsync(ct, "Finance"))
+                .Where(f => !string.Equals(
+                    f.Email, submitterEmployee?.Email, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            await Task.WhenAll(financeUsers.Select(fin =>
+                emailService.SendTripProposalActionRequiredEmailAsync(
+                    fin.Email,
+                    fin.Name,
+                    submitterName,
+                    proposal.Destination,
+                    proposal.StartDate,
+                    proposal.EndDate,
+                    proposal.TotalAmount,
+                    "Finance Verification",
+                    proposal.Id,
+                    null,
+                    ct)));
+        }
+        else
+        {
+            var directManager = await context.GetDirectManagerAsync(
+                submitterId, ct);
+
+            if (directManager != null)
+            {
+                await emailService.SendTripProposalActionRequiredEmailAsync(
+                    directManager.Email,
+                    directManager.Name,
+                    submitterName,
+                    proposal.Destination,
+                    proposal.StartDate,
+                    proposal.EndDate,
+                    proposal.TotalAmount,
+                    "Manager Approval",
+                    proposal.Id,
+                    null,
+                    ct);
+            }
+        }
 
         // Saat Create semua limit peserta masih 0.
         decimal participantTotal = proposal.Participants.Sum(p => p.Amount);

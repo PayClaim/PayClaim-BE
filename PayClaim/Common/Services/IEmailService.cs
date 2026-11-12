@@ -51,6 +51,32 @@ public interface IEmailService
         Guid claimId,
         CancellationToken ct = default);
 
+    Task SendClaimSubmittedToFinanceEmailAsync(
+        string toEmail,
+        string financeName,
+        string employeeName,
+        string employeeNumber,
+        string departmentName,
+        string claimType,
+        string claimDescription,
+        decimal amount,
+        DateTime submissionDate,
+        Guid claimId,
+        CancellationToken ct = default);
+
+    Task SendTripProposalActionRequiredEmailAsync(
+        string toEmail,
+        string approverName,
+        string submitterName,
+        string destination,
+        DateOnly startDate,
+        DateOnly endDate,
+        decimal totalAmount,
+        string stageLabel,
+        Guid proposalId,
+        string? notes = null,
+        CancellationToken ct = default);
+
     Task SendTripProposalStatusEmailAsync(
         string toEmail,
         string picName,
@@ -58,6 +84,7 @@ public interface IEmailService
         string newStatus,
         string? approverName,
         string? notes,
+        Guid? proposalId = null,
         CancellationToken ct = default);
 
     Task SendPasswordResetEmailAsync(

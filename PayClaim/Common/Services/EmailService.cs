@@ -33,7 +33,7 @@ public class EmailService : IEmailService
         {
             try
             {
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
 
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(_settings.SenderName, _settings.SenderEmail));
@@ -340,7 +340,7 @@ public class EmailService : IEmailService
         Guid claimId,
         CancellationToken ct = default)
     {
-        var subject = $"[PayClaim] Pengajuan Klaim Baru dari {employeeName} - Rp {amount:N0}";
+        var subject = $"[PayClaim] Pengajuan Klaim dari {employeeName} - Rp {amount:N0}";
         var claimUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/claims/{claimId}";
         managerName = Enc(managerName);
         employeeName = Enc(employeeName);
@@ -371,7 +371,7 @@ public class EmailService : IEmailService
                         <td style='padding:36px;'>
                             <h3 style='margin:0 0 12px 0; color:#0f172a;'>Halo, {managerName}</h3>
                             <p style='margin:0 0 20px 0; font-size:15px; line-height:1.6; color:#475569;'>
-                                Karyawan bawahan Anda, <strong>{employeeName}</strong>, baru saja mengajukan klaim reimbursement baru yang memerlukan persetujuan dan verifikasi dari Anda sebagai atasan langsung.
+                                Karyawan bawahan Anda, <strong>{employeeName}</strong>, telah mengajukan (atau mengajukan ulang) klaim reimbursement yang memerlukan persetujuan dan verifikasi dari Anda sebagai atasan langsung.
                             </p>
                             
                             <div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin:24px 0;'>
@@ -547,6 +547,224 @@ public class EmailService : IEmailService
         await SendEmailAsync(toEmail, financeName, subject, html, ct);
     }
 
+    public async Task SendClaimSubmittedToFinanceEmailAsync(
+        string toEmail,
+        string financeName,
+        string employeeName,
+        string employeeNumber,
+        string departmentName,
+        string claimType,
+        string claimDescription,
+        decimal amount,
+        DateTime submissionDate,
+        Guid claimId,
+        CancellationToken ct = default)
+    {
+        var subject = $"[PayClaim] Klaim Baru Masuk Antrean Finance: {employeeName} - Rp {amount:N0}";
+        var claimUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/claims/{claimId}";
+        financeName = Enc(financeName);
+        employeeName = Enc(employeeName);
+        employeeNumber = Enc(employeeNumber);
+        departmentName = Enc(departmentName);
+        claimType = Enc(claimType);
+        claimDescription = Enc(claimDescription);
+
+        var html = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+</head>
+<body style='margin:0; padding:0; background-color:#f1f5f9; font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, Helvetica, Arial, sans-serif; color:#334155;'>
+    <table width='100%' border='0' cellspacing='0' cellpadding='0' style='padding: 40px 10px;'>
+        <tr>
+            <td align='center'>
+                <table width='600' border='0' cellspacing='0' cellpadding='0' style='max-width:600px; width:100%; background:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);'>
+                    <tr>
+                        <td style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:28px 36px; color:#ffffff;'>
+                            <div style='font-size:20px; font-weight:700;'>PayClaim - Notifikasi Antrean Finance</div>
+                            <div style='font-size:13px; color:#94a3b8; margin-top:4px;'>Pengajuan Klaim Memerlukan Verifikasi Finance</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style='padding:36px;'>
+                            <h3 style='margin:0 0 12px 0; color:#0f172a;'>Halo, {financeName}</h3>
+                            <p style='margin:0 0 20px 0; font-size:15px; line-height:1.6; color:#475569;'>
+                                Pengajuan klaim reimbursement dari <strong>{employeeName}</strong> telah masuk ke antrean verifikasi Tim Finance. Pengajuan ini tidak melewati tahap approval Manager karena pengaju merupakan Manager.
+                            </p>
+
+                            <div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin:24px 0;'>
+                                <div style='font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:#64748b; margin-bottom:12px;'>
+                                    Rincian Pengajuan Klaim
+                                </div>
+                                <table width='100%' style='font-size:14px; border-collapse:collapse; line-height:1.6;'>
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b; width:35%;'>Nama Pengaju</td>
+                                        <td style='padding:6px 0; font-weight:600; color:#0f172a;'>{employeeName} ({employeeNumber})</td>
+                                    </tr>
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b;'>Departemen</td>
+                                        <td style='padding:6px 0; font-weight:600; color:#0f172a;'>{departmentName}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b;'>Jenis Klaim</td>
+                                        <td style='padding:6px 0; font-weight:600; color:#0f172a;'>{claimType}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b;'>Deskripsi</td>
+                                        <td style='padding:6px 0; font-weight:600; color:#0f172a;'>{claimDescription}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b;'>Nominal Klaim</td>
+                                        <td style='padding:6px 0; font-weight:700; color:#059669; font-size:15px;'>Rp {amount:N0}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b;'>Tanggal Pengajuan</td>
+                                        <td style='padding:6px 0; color:#0f172a;'>{submissionDate:dd MMMM yyyy HH:mm}</td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <div style='text-align: center; margin: 28px 0 16px 0;'>
+                                <a href='{claimUrl}' target='_blank' style='display: inline-block; background-color: #059669; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.2);'>
+                                    Buka &amp; Proses Klaim di Portal &rarr;
+                                </a>
+                            </div>
+
+                            <p style='font-size:13px; color:#64748b; text-align:center; margin:0;'>
+                                Silakan verifikasi bukti transaksi dan lakukan persetujuan atau pembayaran melalui portal.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style='background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 36px; text-align: center;'>
+                            <p style='margin: 0; font-size: 12px; color: #94a3b8;'>
+                                &copy; 2026 PayClaim - HR &amp; Finance Management Portal.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>";
+
+        await SendEmailAsync(toEmail, financeName, subject, html, ct);
+    }
+
+    public async Task SendTripProposalActionRequiredEmailAsync(
+        string toEmail,
+        string approverName,
+        string submitterName,
+        string destination,
+        DateOnly startDate,
+        DateOnly endDate,
+        decimal totalAmount,
+        string stageLabel,
+        Guid proposalId,
+        string? notes = null,
+        CancellationToken ct = default)
+    {
+        var subject = $"[PayClaim] Proposal SPD Menunggu Persetujuan Anda: {destination}";
+        var proposalUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/trip-proposals/{proposalId}";
+        approverName = Enc(approverName);
+        submitterName = Enc(submitterName);
+        destination = Enc(destination);
+        stageLabel = Enc(stageLabel);
+        notes = string.IsNullOrWhiteSpace(notes) ? null : Enc(notes);
+
+        var html = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+</head>
+<body style='margin:0; padding:0; background-color:#f1f5f9; font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, Helvetica, Arial, sans-serif; color:#334155;'>
+    <table width='100%' border='0' cellspacing='0' cellpadding='0' style='padding: 40px 10px;'>
+        <tr>
+            <td align='center'>
+                <table width='600' border='0' cellspacing='0' cellpadding='0' style='max-width:600px; width:100%; background:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);'>
+                    <tr>
+                        <td style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:28px 36px; color:#ffffff;'>
+                            <div style='font-size:20px; font-weight:700;'>PayClaim - Perjalanan Dinas (SPD)</div>
+                            <div style='font-size:13px; color:#94a3b8; margin-top:4px;'>Menunggu Tindakan: {stageLabel}</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style='padding:36px;'>
+                            <h3 style='margin:0 0 12px 0; color:#0f172a;'>Halo, {approverName}</h3>
+                            <p style='margin:0 0 20px 0; font-size:15px; line-height:1.6; color:#475569;'>
+                                Proposal perjalanan dinas dari <strong>{submitterName}</strong> saat ini berada pada tahap <strong>{stageLabel}</strong> dan memerlukan persetujuan Anda.
+                            </p>
+
+                            <div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin:24px 0;'>
+                                <div style='font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:#64748b; margin-bottom:12px;'>
+                                    Rincian Proposal
+                                </div>
+                                <table width='100%' style='font-size:14px; border-collapse:collapse; line-height:1.6;'>
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b; width:35%;'>Pengaju (PIC)</td>
+                                        <td style='padding:6px 0; font-weight:600; color:#0f172a;'>{submitterName}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b;'>Destinasi</td>
+                                        <td style='padding:6px 0; font-weight:600; color:#0f172a;'>{destination}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b;'>Tanggal</td>
+                                        <td style='padding:6px 0; color:#0f172a;'>{startDate:dd MMMM yyyy} s/d {endDate:dd MMMM yyyy}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b;'>Total Pengajuan</td>
+                                        <td style='padding:6px 0; font-weight:700; color:#0f172a; font-size:15px;'>Rp {totalAmount:N0}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b;'>Tahap</td>
+                                        <td style='padding:6px 0;'>
+                                            <span style='background-color:#2563eb; color:#ffffff; padding:4px 12px; border-radius:12px; font-size:12px; font-weight:bold;'>
+                                                {stageLabel}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {(string.IsNullOrWhiteSpace(notes) ? "" : $@"
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b; vertical-align:top;'>Catatan</td>
+                                        <td style='padding:6px 0; color:#334155;'><em>&ldquo;{notes}&rdquo;</em></td>
+                                    </tr>")}
+                                </table>
+                            </div>
+
+                            <div style='text-align: center; margin: 28px 0 16px 0;'>
+                                <a href='{proposalUrl}' target='_blank' style='display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);'>
+                                    Tinjau &amp; Berikan Persetujuan &rarr;
+                                </a>
+                            </div>
+
+                            <p style='font-size:13px; color:#64748b; text-align:center; margin:0;'>
+                                Mohon segera ditinjau agar proses perjalanan dinas dapat dilanjutkan.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style='background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 36px; text-align: center;'>
+                            <p style='margin: 0; font-size: 12px; color: #94a3b8;'>
+                                &copy; 2026 PayClaim - HR &amp; Finance Management Portal.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>";
+
+        await SendEmailAsync(toEmail, approverName, subject, html, ct);
+    }
+
     public async Task SendTripProposalStatusEmailAsync(
         string toEmail,
         string picName,
@@ -554,48 +772,125 @@ public class EmailService : IEmailService
         string newStatus,
         string? approverName,
         string? notes,
+        Guid? proposalId = null,
         CancellationToken ct = default)
     {
-        var subject = $"[PayClaim] Pembaruan Status Proposal SPD ({destination}): {newStatus}";
+        var subject = newStatus switch
+        {
+            "Approved" => $"[PayClaim] Proposal SPD Disetujui: {destination}",
+            "Completed" => $"[PayClaim] Perjalanan Dinas Selesai: {destination}",
+            "Rejected" => $"[PayClaim] Proposal SPD Ditolak: {destination}",
+            "NeedsRevision" => $"[PayClaim] Proposal SPD Memerlukan Revisi: {destination}",
+            "UnderReview" => $"[PayClaim] Proposal SPD Diteruskan ke Finance: {destination}",
+            "FinanceManagerReview" => $"[PayClaim] Proposal SPD Menunggu Finance Manager: {destination}",
+            _ => $"[PayClaim] Pembaruan Status Proposal SPD ({destination}): {newStatus}"
+        };
+
         picName = Enc(picName);
         destination = Enc(destination);
         approverName = string.IsNullOrWhiteSpace(approverName) ? null : Enc(approverName);
         notes = string.IsNullOrWhiteSpace(notes) ? null : Enc(notes);
+
         var badgeColor = newStatus switch
         {
             "Approved" or "Completed" => "#16a34a",
             "Rejected" => "#dc2626",
-            "UnderReview" => "#2563eb",
+            "UnderReview" or "FinanceManagerReview" => "#2563eb",
             _ => "#d97706"
         };
+
+        var statusDisplay = newStatus switch
+        {
+            "UnderReview" => "Under Review (Menunggu Verifikasi Finance)",
+            "FinanceManagerReview" => "Finance Manager Review",
+            "Approved" => "Approved",
+            "Completed" => "Completed",
+            "Rejected" => "Rejected",
+            "NeedsRevision" => "Needs Revision",
+            _ => newStatus
+        };
+
+        var statusExplanation = newStatus switch
+        {
+            "UnderReview" => $"Proposal perjalanan dinas Anda telah <strong>disetujui oleh Manajer ({approverName ?? "Manager"})</strong> dan saat ini <strong>diteruskan ke Tim Finance</strong> untuk verifikasi anggaran.",
+            "FinanceManagerReview" => $"Proposal perjalanan dinas Anda telah <strong>diverifikasi oleh Finance</strong> dan <strong>diteruskan ke Finance Manager</strong> karena melebihi batas approval Finance.",
+            "Approved" => $"Proposal perjalanan dinas Anda telah <strong>disetujui</strong> oleh <strong>{approverName ?? "Approver"}</strong>. Anda sudah dapat melakukan perjalanan dinas sesuai jadwal.",
+            "Completed" => $"Perjalanan dinas ke <strong>{destination}</strong> telah <strong>diselesaikan</strong> dan laporan perjalanan telah diterima sistem.",
+            "Rejected" => $"Proposal perjalanan dinas Anda telah <strong>ditolak</strong> oleh <strong>{approverName ?? "Approver"}</strong>.",
+            "NeedsRevision" => $"Proposal perjalanan dinas Anda <strong>memerlukan revisi/perbaikan</strong> sesuai catatan approver. Silakan perbarui dan ajukan ulang melalui portal.",
+            _ => $"Status proposal perjalanan dinas Anda telah diperbarui oleh <strong>{approverName ?? "Sistem"}</strong> menjadi <strong>{newStatus}</strong>."
+        };
+
+        var proposalUrl = proposalId.HasValue
+            ? $"{_settings.FrontendUrl.TrimEnd('/')}/trip-proposals/{proposalId.Value}"
+            : $"{_settings.FrontendUrl.TrimEnd('/')}/trip-proposals";
 
         var html = $@"
 <!DOCTYPE html>
 <html>
-<head><meta charset='utf-8'></head>
-<body style='margin:0; padding:0; background-color:#f1f5f9; font-family: sans-serif; color:#334155;'>
-    <table width='100%' style='padding: 40px 10px;'>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+</head>
+<body style='margin:0; padding:0; background-color:#f1f5f9; font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, Helvetica, Arial, sans-serif; color:#334155;'>
+    <table width='100%' border='0' cellspacing='0' cellpadding='0' style='padding: 40px 10px;'>
         <tr>
             <td align='center'>
-                <table width='600' style='max-width:600px; background:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0;'>
+                <table width='600' border='0' cellspacing='0' cellpadding='0' style='max-width:600px; width:100%; background:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);'>
                     <tr>
-                        <td style='background:#0f172a; padding:24px 32px; color:#ffffff;'>
-                            <div style='font-size:20px; font-weight:700;'>PayClaim - Perjalanan Dinas (SPD)</div>
+                        <td style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:28px 36px; color:#ffffff;'>
+                            <div style='font-size:20px; font-weight:700;'>PayClaim - Notifikasi Proposal SPD</div>
+                            <div style='font-size:13px; color:#94a3b8; margin-top:4px;'>Perjalanan Dinas</div>
                         </td>
                     </tr>
                     <tr>
-                        <td style='padding:32px;'>
-                            <h3 style='margin-top:0;'>Halo {picName},</h3>
-                            <p>Proposal perjalanan dinas ke <strong>{destination}</strong> telah ditinjau oleh <strong>{approverName ?? "Sistem"}</strong>:</p>
-                            
-                            <div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin:20px 0;'>
-                                <p style='margin:6px 0;'><strong>Destinasi:</strong> {destination}</p>
-                                <p style='margin:6px 0;'>
-                                    <strong>Status:</strong> 
-                                    <span style='background-color:{badgeColor}; color:#ffffff; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:bold;'>{newStatus}</span>
-                                </p>
-                                {(string.IsNullOrWhiteSpace(notes) ? "" : $"<p style='margin:6px 0;'><strong>Catatan Approver:</strong> <em>\"{notes}\"</em></p>")}
+                        <td style='padding:36px;'>
+                            <h3 style='margin:0 0 12px 0; color:#0f172a;'>Halo, {picName}</h3>
+                            <p style='margin:0 0 20px 0; font-size:15px; line-height:1.6; color:#475569;'>
+                                {statusExplanation}
+                            </p>
+
+                            <div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin:24px 0;'>
+                                <div style='font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:#64748b; margin-bottom:12px;'>
+                                    Rincian Proposal
+                                </div>
+                                <table width='100%' style='font-size:14px; border-collapse:collapse; line-height:1.6;'>
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b; width:35%;'>Destinasi</td>
+                                        <td style='padding:6px 0; font-weight:600; color:#0f172a;'>{destination}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b;'>Status</td>
+                                        <td style='padding:6px 0;'>
+                                            <span style='background-color:{badgeColor}; color:#ffffff; padding:4px 12px; border-radius:12px; font-size:12px; font-weight:bold; display:inline-block;'>
+                                                {statusDisplay}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b;'>Diproses Oleh</td>
+                                        <td style='padding:6px 0; font-weight:600; color:#0f172a;'>{approverName ?? "Sistem"}</td>
+                                    </tr>
+                                    {(string.IsNullOrWhiteSpace(notes) ? "" : $@"
+                                    <tr>
+                                        <td style='padding:6px 0; color:#64748b; vertical-align:top;'>Catatan</td>
+                                        <td style='padding:6px 0; color:#334155;'><em>&ldquo;{notes}&rdquo;</em></td>
+                                    </tr>")}
+                                </table>
                             </div>
+
+                            <div style='text-align: center; margin: 28px 0 16px 0;'>
+                                <a href='{proposalUrl}' target='_blank' style='display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 28px; border-radius: 8px;'>
+                                    Lihat Detail Proposal di Portal &rarr;
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style='background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 36px; text-align: center;'>
+                            <p style='margin: 0; font-size: 12px; color: #94a3b8;'>
+                                &copy; 2026 PayClaim - HR &amp; Finance Management Portal.
+                            </p>
                         </td>
                     </tr>
                 </table>

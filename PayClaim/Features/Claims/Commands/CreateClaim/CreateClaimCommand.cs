@@ -257,12 +257,32 @@ public class CreateClaimHandler(
 
         await uow.SaveChangesAsync(ct);
 
-        // 5. Kirim notifikasi email ke Atasan Langsung (Manager) jika ada.
+        // 5. Kirim notifikasi email ke approver berikutnya.
         // Jika pengaju adalah Manager, tahap Manager dilewati sehingga
-        // notifikasi ke atasan langsung tidak dikirim.
-        if (!submittedByManager &&
-            employee.Manager != null &&
-            !string.IsNullOrWhiteSpace(employee.Manager.Email))
+        // notifikasi dikirim ke Tim Finance.
+        if (submittedByManager)
+        {
+            var financeUsers = (await context.GetActiveByRolesAsync(ct, "Finance"))
+                .Where(f => !string.Equals(
+                    f.Email, employee.Email, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            await Task.WhenAll(financeUsers.Select(fin =>
+                emailService.SendClaimSubmittedToFinanceEmailAsync(
+                    fin.Email,
+                    fin.Name,
+                    employee.FullName,
+                    employee.Number,
+                    employee.Department?.Name ?? "-",
+                    claim.ClaimType.ToString(),
+                    claim.Description,
+                    claim.Amount,
+                    claim.SubmittedAt,
+                    claim.Id,
+                    ct)));
+        }
+        else if (employee.Manager != null &&
+                 !string.IsNullOrWhiteSpace(employee.Manager.Email))
         {
             await emailService.SendClaimSubmittedToManagerEmailAsync(
                 employee.Manager.Email,

@@ -18,6 +18,7 @@ public class UpdateTripProposalHandler(
     IUnitOfWork uow,
     PayClaimDbContext context,
     IFileStorageService fileStorage,
+    IEmailService emailService,
     ICurrentUser currentUser,
     IHttpContextAccessor httpContextAccessor) : IRequestHandler<UpdateTripProposalCommand, TripProposalDetailDto>
 {
@@ -120,11 +121,66 @@ public class UpdateTripProposalHandler(
             // Peserta tidak dikirim: limit peserta yang sudah ada dipertahankan.
         }
 
-        proposal.Status = TripProposalStatus.Submitted;
-        proposal.SubmittedAt = DateTime.UtcNow;   // tambahkan ini
+        // Jika PIC adalah Manager, tahap approval Manager dilewati
+        // sehingga hasil revisi langsung masuk ke Finance.
+        var picIsManager = await context.HasRoleAsync(
+            currentPic.EmployeeId, "Manager", ct);
+
+        proposal.Status = picIsManager
+            ? TripProposalStatus.UnderReview
+            : TripProposalStatus.Submitted;
+        proposal.SubmittedAt = DateTime.UtcNow;
 
         uow.TripProposals.Update(proposal);
         await uow.SaveChangesAsync(ct);
+
+        // Notifikasi email ke approver berikutnya setelah revisi diajukan ulang.
+        var picName = currentPic.Employee?.FullName ?? "PIC";
+        var proposalTotal = proposal.TotalAmount +
+            proposal.Participants.Sum(p => p.Amount);
+
+        if (picIsManager)
+        {
+            var financeUsers = (await context.GetActiveByRolesAsync(ct, "Finance"))
+                .Where(f => !string.Equals(
+                    f.Email, currentPic.Employee?.Email, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            await Task.WhenAll(financeUsers.Select(fin =>
+                emailService.SendTripProposalActionRequiredEmailAsync(
+                    fin.Email,
+                    fin.Name,
+                    picName,
+                    proposal.Destination,
+                    proposal.StartDate,
+                    proposal.EndDate,
+                    proposalTotal,
+                    "Finance Verification",
+                    proposal.Id,
+                    null,
+                    ct)));
+        }
+        else
+        {
+            var directManager = await context.GetDirectManagerAsync(
+                currentPic.EmployeeId, ct);
+
+            if (directManager != null)
+            {
+                await emailService.SendTripProposalActionRequiredEmailAsync(
+                    directManager.Email,
+                    directManager.Name,
+                    picName,
+                    proposal.Destination,
+                    proposal.StartDate,
+                    proposal.EndDate,
+                    proposalTotal,
+                    "Manager Approval",
+                    proposal.Id,
+                    null,
+                    ct);
+            }
+        }
 
         var approvals = await context.TripApprovals
             .Where(a => a.TripProposalId == proposal.Id)

@@ -36,6 +36,12 @@ public class CreateClaimHandler(
                 "Akun Administrator tidak diperbolehkan mengajukan klaim reimbursement.");
         }
 
+        // Jika pengaju adalah Manager, tahap approval Manager dilewati
+        // sehingga klaim langsung masuk ke Finance (UnderReview).
+        var submittedByManager = roles.Contains(
+            "Manager",
+            StringComparer.OrdinalIgnoreCase);
+
         var request = command.Request;
 
         // 1. Ambil Employee beserta Manager dan Departemen berdasarkan EmployeeId dari JWT
@@ -235,7 +241,9 @@ public class CreateClaimHandler(
             TransactionDate = request.TransactionDate,
             Amount = request.Amount,
             SubmittedAt = DateTime.UtcNow,
-            Status = ClaimStatus.Submitted,
+            Status = submittedByManager
+                ? ClaimStatus.UnderReview
+                : ClaimStatus.Submitted,
             FilePath = filePath,
 
             // Selalu menggunakan EmployeeId dari JWT
@@ -249,8 +257,12 @@ public class CreateClaimHandler(
 
         await uow.SaveChangesAsync(ct);
 
-        // 5. Kirim notifikasi email ke Atasan Langsung (Manager) jika ada
-        if (employee.Manager != null && !string.IsNullOrWhiteSpace(employee.Manager.Email))
+        // 5. Kirim notifikasi email ke Atasan Langsung (Manager) jika ada.
+        // Jika pengaju adalah Manager, tahap Manager dilewati sehingga
+        // notifikasi ke atasan langsung tidak dikirim.
+        if (!submittedByManager &&
+            employee.Manager != null &&
+            !string.IsNullOrWhiteSpace(employee.Manager.Email))
         {
             await emailService.SendClaimSubmittedToManagerEmailAsync(
                 employee.Manager.Email,

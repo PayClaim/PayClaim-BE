@@ -38,6 +38,12 @@ public class CreateTripProposalHandler(
                 "Akun Administrator tidak diperbolehkan mengajukan proposal perjalanan dinas.");
         }
 
+        // Jika pengaju adalah Manager, tahap approval Manager dilewati
+        // sehingga proposal langsung masuk ke Finance (UnderReview).
+        var submittedByManager = roles.Contains(
+            "Manager",
+            StringComparer.OrdinalIgnoreCase);
+
         var submitterEmployee = await uow.Employees.GetByIdAsync(new object[] { submitterId }, ct);
         if (submitterEmployee != null && string.Equals(submitterEmployee.PositionId, "DIR", StringComparison.OrdinalIgnoreCase))
         {
@@ -149,7 +155,9 @@ public class CreateTripProposalHandler(
 
             Description = request.Description,
             SubmittedAt = DateTime.UtcNow,
-            Status = TripProposalStatus.Submitted,
+            Status = submittedByManager
+                ? TripProposalStatus.UnderReview
+                : TripProposalStatus.Submitted,
             FilePath = filePath
         };
 

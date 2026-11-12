@@ -17,7 +17,7 @@ namespace PayClaim.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -156,7 +156,8 @@ namespace PayClaim.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<Guid?>("EmployeeBenefitId")
                         .HasColumnType("uniqueidentifier");
@@ -184,9 +185,22 @@ namespace PayClaim.Migrations
 
                     b.HasIndex("EmployeeBenefitId");
 
-                    b.HasIndex("EmployeeId");
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_Claims_Status");
+
+                    b.HasIndex("SubmittedAt")
+                        .HasDatabaseName("IX_Claims_SubmittedAt");
+
+                    b.HasIndex("TransactionDate")
+                        .HasDatabaseName("IX_Claims_TransactionDate");
 
                     b.HasIndex("TripProposalId");
+
+                    b.HasIndex("EmployeeId", "SubmittedAt")
+                        .HasDatabaseName("IX_Claims_EmployeeId_SubmittedAt");
+
+                    b.HasIndex("Status", "SubmittedAt")
+                        .HasDatabaseName("IX_Claims_Status_SubmittedAt");
 
                     b.ToTable("Claims", (string)null);
                 });
@@ -297,7 +311,8 @@ namespace PayClaim.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.HasIndex("ManagerId");
+                    b.HasIndex("ManagerId")
+                        .HasDatabaseName("IX_Employees_ManagerId");
 
                     b.HasIndex("Number")
                         .IsUnique();
@@ -454,7 +469,8 @@ namespace PayClaim.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("Destination")
                         .IsRequired()

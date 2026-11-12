@@ -12,7 +12,6 @@ public class EmployeeConfigurations : IEntityTypeConfiguration<Employee>
 
         builder.HasKey(e => e.Id);
 
-        // Properties
         builder.Property(e => e.Number)
             .IsRequired()
             .HasMaxLength(20);
@@ -37,12 +36,15 @@ public class EmployeeConfigurations : IEntityTypeConfiguration<Employee>
 
         builder.Property(e => e.DepartmentId)
             .HasColumnType("varchar(50)");
-        // Unique Indexes
+
         builder.HasIndex(e => e.Number)
             .IsUnique();
 
         builder.HasIndex(e => e.Email)
             .IsUnique();
+
+        builder.HasIndex(e => e.ManagerId)
+            .HasDatabaseName("IX_Employees_ManagerId");
 
         // Relationships
         builder.HasOne(e => e.Position)
@@ -59,6 +61,5 @@ public class EmployeeConfigurations : IEntityTypeConfiguration<Employee>
             .WithMany()
             .HasForeignKey(e => e.ManagerId)
             .OnDelete(DeleteBehavior.Restrict);
-
     }
 }

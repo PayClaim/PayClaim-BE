@@ -33,9 +33,9 @@ public class TripProposalConfigurations
             .HasColumnType("datetime2")
             .IsRequired();
 
-        builder.Property(tp => tp.Description)
-            .HasColumnType("nvarchar(max)")
-            .IsRequired();
+        builder.Property(t => t.Description)
+            .IsRequired()
+            .HasMaxLength(1000);
 
         builder.Property(tp => tp.Status)
             .IsRequired();

@@ -99,12 +99,9 @@ public class UpdateTripProposalHandler(
                 throw new BusinessRuleException("Duplicate participant detected in proposal.");
             }
 
-            var totalParticipantsAmount = req.Participants.Sum(p => p.Amount);
-            if (totalParticipantsAmount != req.TotalAmount)
-            {
-                throw new BusinessRuleException(
-                    $"Sum of participants' budgets ({totalParticipantsAmount:N0}) does not match the proposal total amount ({req.TotalAmount:N0}).");
-            }
+            var previousAmounts = proposal.Participants
+                .GroupBy(p => p.EmployeeId)
+                .ToDictionary(g => g.Key, g => g.First().Amount);
 
             context.ProposalParticipants.RemoveRange(proposal.Participants);
 
@@ -113,23 +110,21 @@ public class UpdateTripProposalHandler(
                 TripProposalId = proposal.Id,
                 EmployeeId = p.EmployeeId,
                 IsPic = p.IsPic,
-                Amount = p.Amount
+                Amount = p.Amount > 0
+                    ? p.Amount
+                    : (previousAmounts.TryGetValue(p.EmployeeId, out var prev) ? prev : 0)
             }).ToList();
         }
         else
         {
-            var existingTotal = proposal.Participants.Sum(p => p.Amount);
-            if (existingTotal != req.TotalAmount)
-            {
-                throw new BusinessRuleException(
-                    $"Proposal total amount ({req.TotalAmount:N0}) does not match existing participants' budgets ({existingTotal:N0}).");
-            }
+            // Peserta tidak dikirim: limit peserta yang sudah ada dipertahankan.
         }
 
         // Perbarui waktu submission ketika proposal diajukan ulang.
         proposal.SubmittedAt = DateTime.UtcNow.AddHours(7);
 
         proposal.Status = TripProposalStatus.Submitted;
+        proposal.SubmittedAt = DateTime.UtcNow;   // tambahkan ini
 
         uow.TripProposals.Update(proposal);
         await uow.SaveChangesAsync(ct);

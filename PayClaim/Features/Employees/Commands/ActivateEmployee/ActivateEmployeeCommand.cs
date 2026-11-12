@@ -105,7 +105,7 @@ public class ActivateEmployeeHandler(PayClaimDbContext db) : IRequestHandler<Act
                     {
                         AccountId = account.Id,
                         RoleId = role.Id,
-                        AssignedAt = DateTime.UtcNow
+                        AssignedAt = DateTime.UtcNow.AddHours(7)
                     }, ct);
                 }
             }

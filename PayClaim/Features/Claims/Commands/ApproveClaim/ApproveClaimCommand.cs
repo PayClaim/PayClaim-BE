@@ -181,7 +181,7 @@ public class ApproveClaimHandler(
             Decision = ApprovalDecision.Approved,
             Notes = command.Request.Notes,
             ApprovalLevel = currentLevel,
-            DecidedAt = DateTime.UtcNow
+            DecidedAt = DateTime.UtcNow.AddHours(7)
         };
 
         await uow.ClaimApprovals.AddAsync(

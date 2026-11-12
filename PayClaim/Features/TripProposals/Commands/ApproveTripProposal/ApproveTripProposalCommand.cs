@@ -1,3 +1,5 @@
+
+using System.Globalization;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Constants;
@@ -104,6 +106,9 @@ public class ApproveTripProposalHandler(
         TripApprovalDecision recordedDecision =
             command.Request.Decision;
 
+        decimal? previousAccommodationBudget = null;
+        decimal? updatedAccommodationBudget = null;
+
         // LEVEL 1: MANAGER
         if (proposal.Status == TripProposalStatus.Submitted)
         {
@@ -159,6 +164,29 @@ public class ApproveTripProposalHandler(
 
             if (command.Request.Decision == TripApprovalDecision.Approved)
             {
+                // Finance must provide the Accommodation Budget.
+                if (!command.Request.TotalAmount.HasValue)
+                {
+                    throw new BusinessRuleException(
+                        "Finance must provide the accommodation budget.");
+                }
+
+                decimal approvedAccommodationBudget =
+                    command.Request.TotalAmount.Value;
+
+                if (approvedAccommodationBudget <= 0)
+                {
+                    throw new BusinessRuleException(
+                        "Accommodation budget must be greater than zero.");
+                }
+
+                // Keep the previous and updated budget for approval history.
+                previousAccommodationBudget = proposal.TotalAmount;
+                updatedAccommodationBudget = approvedAccommodationBudget;
+
+                // Update Accommodation Budget.
+                proposal.TotalAmount = approvedAccommodationBudget;
+
                 var requestedParticipants = command.Request.Participants;
 
                 // Finance must provide limits for all participants.
@@ -283,15 +311,40 @@ public class ApproveTripProposalHandler(
 
         uow.TripProposals.Update(proposal);
 
+        // Keep the approver's manual note.
+        string? approvalNotes = command.Request.Notes;
+
+        // Add budget adjustment information to Notes only when
+        // Finance approves and actually changes the Accommodation Budget.
+        if (currentLevel == 2 &&
+            command.Request.Decision == TripApprovalDecision.Approved &&
+            previousAccommodationBudget.HasValue &&
+            updatedAccommodationBudget.HasValue &&
+            previousAccommodationBudget.Value != updatedAccommodationBudget.Value)
+        {
+            string previousAmount = previousAccommodationBudget.Value
+                .ToString(CultureInfo.InvariantCulture);
+
+            string updatedAmount = updatedAccommodationBudget.Value
+                .ToString(CultureInfo.InvariantCulture);
+
+            string budgetMarker =
+                $"[ACCOMMODATION_BUDGET:{previousAmount}|{updatedAmount}]";
+
+            approvalNotes = string.IsNullOrWhiteSpace(approvalNotes)
+                ? budgetMarker
+                : $"{budgetMarker}{Environment.NewLine}{approvalNotes}";
+        }
+
         var approvalRecord = new TripApproval
         {
             TripProposalId = proposal.Id,
             ApproverId = approver.Id,
             ApproverName = approver.FullName,
             Decision = recordedDecision,
-            Notes = command.Request.Notes,
+            Notes = approvalNotes,
             ApprovalLevel = currentLevel,
-            DecidedAt = DateTime.UtcNow
+            DecidedAt = DateTime.UtcNow.AddHours(7)
         };
 
         await uow.TripApprovals.AddAsync(
@@ -301,6 +354,7 @@ public class ApproveTripProposalHandler(
         await uow.SaveChangesAsync(ct);
 
         // Send a status notification email to the proposal PIC.
+        // Send only the manual note, not the internal budget marker.
         var picParticipant = proposal.Participants
             .FirstOrDefault(p => p.IsPic)
             ?? proposal.Participants.FirstOrDefault();

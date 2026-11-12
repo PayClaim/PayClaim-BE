@@ -202,7 +202,7 @@ public class UpdateClaimHandler(
         claim.Status = claimantIsManager
             ? ClaimStatus.UnderReview
             : ClaimStatus.Submitted;
-        claim.SubmittedAt = DateTime.UtcNow;
+        claim.SubmittedAt = DateTime.UtcNow.AddHours(7);
 
         uow.Claims.Update(claim);
         await uow.SaveChangesAsync(ct);

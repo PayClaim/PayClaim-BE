@@ -129,7 +129,7 @@ public class UpdateTripProposalHandler(
         proposal.Status = picIsManager
             ? TripProposalStatus.UnderReview
             : TripProposalStatus.Submitted;
-        proposal.SubmittedAt = DateTime.UtcNow;
+        proposal.SubmittedAt = DateTime.UtcNow.AddHours(7);
 
         uow.TripProposals.Update(proposal);
         await uow.SaveChangesAsync(ct);

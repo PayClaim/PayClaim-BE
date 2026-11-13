@@ -129,6 +129,16 @@ public class GetTripProposalsHandler(PayClaimDbContext context, ICurrentUser cur
                     p.EmployeeId == filter.EmployeeId.Value));
         }
 
+        // 5b. Filter pencarian teks
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var s = filter.Search.Trim();
+            dbQuery = dbQuery.Where(tp =>
+                tp.Destination.Contains(s) ||
+                (tp.Description != null && tp.Description.Contains(s)) ||
+                tp.Participants.Any(p => p.Employee.FullName.Contains(s)));
+        }
+
         // 6. Hitung total data sebelum pagination
         var totalCount = await dbQuery.CountAsync(ct);
 

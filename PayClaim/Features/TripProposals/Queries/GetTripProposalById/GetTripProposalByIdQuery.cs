@@ -81,17 +81,25 @@ public class GetTripProposalByIdHandler(
             isManager &&
             accessInfo.PicManagerId == currentEmpId;
 
-        bool hasApproved = await context.TripApprovals
-            .AsNoTracking()
-            .AnyAsync(
-                ta =>
-                    ta.TripProposalId == query.Id &&
-                    ta.ApproverId == currentEmpId,
-                ct);
+        bool hasAccess =
+            isAdmin ||
+            accessInfo.IsParticipant ||
+            isDirectManager;
 
-        bool isFinanceEligible =
-            (isFinance || isFinanceManager) &&
-            (
+        if (!hasAccess)
+        {
+            hasAccess = await context.TripApprovals
+                .AsNoTracking()
+                .AnyAsync(
+                    ta =>
+                        ta.TripProposalId == query.Id &&
+                        ta.ApproverId == currentEmpId,
+                    ct);
+        }
+
+        if (!hasAccess && (isFinance || isFinanceManager))
+        {
+            hasAccess =
                 accessInfo.Status == TripProposalStatus.UnderReview ||
                 accessInfo.Status == TripProposalStatus.FinanceManagerReview ||
                 accessInfo.Status == TripProposalStatus.Approved ||
@@ -102,15 +110,8 @@ public class GetTripProposalByIdHandler(
                         ta =>
                             ta.TripProposalId == query.Id &&
                             ta.ApprovalLevel >= 2,
-                        ct)
-            );
-
-        bool hasAccess =
-            isAdmin ||
-            accessInfo.IsParticipant ||
-            isDirectManager ||
-            hasApproved ||
-            isFinanceEligible;
+                        ct);
+        }
 
         if (!hasAccess)
         {

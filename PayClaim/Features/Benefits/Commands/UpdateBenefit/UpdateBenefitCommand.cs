@@ -1,13 +1,15 @@
 using MediatR;
+using Microsoft.Extensions.Caching.Memory;
 using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
+using PayClaim.Features.Benefits.Queries;
 
 namespace PayClaim.Features.Benefits.Commands;
 
 public record UpdateBenefitCommand(Guid Id, UpdateBenefitDto Request) : IRequest;
 
-public class UpdateBenefitHandler(IUnitOfWork uow) : IRequestHandler<UpdateBenefitCommand>
+public class UpdateBenefitHandler(IUnitOfWork uow, IMemoryCache cache) : IRequestHandler<UpdateBenefitCommand>
 {
     public async Task Handle(
         UpdateBenefitCommand command,
@@ -40,5 +42,6 @@ public class UpdateBenefitHandler(IUnitOfWork uow) : IRequestHandler<UpdateBenef
         uow.Benefits.Update(benefit);
 
         await uow.SaveChangesAsync(ct);
+        cache.Remove(GetBenefitsHandler.CacheKey);
     }
 }

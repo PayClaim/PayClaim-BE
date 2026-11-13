@@ -52,33 +52,14 @@ public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUse
 
             var requesterEmployeeId = employeeId.Value;
 
-            HashSet<Guid> approvedByRequesterClaimIds = [];
-            HashSet<Guid> financeVisibleClaimIds = [];
-
-            if (isManager)
-            {
-                approvedByRequesterClaimIds = await context.ClaimApprovals
-                    .AsNoTracking()
-                    .Where(ca => ca.ApproverId == requesterEmployeeId)
-                    .Select(ca => ca.ClaimId)
-                    .ToHashSetAsync(ct);
-            }
-
-            if (isFinance)
-            {
-                financeVisibleClaimIds = await context.ClaimApprovals
-                    .AsNoTracking()
-                    .Where(ca => ca.ApprovalLevel >= 2)
-                    .Select(ca => ca.ClaimId)
-                    .ToHashSetAsync(ct);
-            }
-
             dbQuery = dbQuery.Where(c =>
                 (
                     isManager &&
                     (
                         c.Employee.ManagerId == requesterEmployeeId ||
-                        approvedByRequesterClaimIds.Contains(c.Id)
+                        context.ClaimApprovals.Any(ca =>
+                            ca.ClaimId == c.Id &&
+                            ca.ApproverId == requesterEmployeeId)
                     )
                 )
                 ||
@@ -88,7 +69,9 @@ public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUse
                         c.Status == ClaimStatus.UnderReview ||
                         c.Status == ClaimStatus.Approved ||
                         c.Status == ClaimStatus.Paid ||
-                        financeVisibleClaimIds.Contains(c.Id)
+                        context.ClaimApprovals.Any(ca =>
+                            ca.ClaimId == c.Id &&
+                            ca.ApprovalLevel >= 2)
                     )
                 )
             );

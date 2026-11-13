@@ -241,7 +241,9 @@ namespace PayClaim.Migrations
 
                     b.HasIndex("ApproverId");
 
-                    b.HasIndex("ClaimId");
+                    b.HasIndex("ClaimId", "ApprovalLevel");
+
+                    b.HasIndex("ClaimId", "ApproverId");
 
                     b.ToTable("Claim_Approvals", (string)null);
                 });
@@ -498,6 +500,8 @@ namespace PayClaim.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Status", "SubmittedAt");
 
                     b.ToTable("Trip_proposals", (string)null);
                 });

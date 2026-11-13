@@ -21,6 +21,11 @@ try
     // Serilog logging
     builder.AddPayClaimSerilog();
 
+    builder.Services.AddResponseCompression(options =>
+    {
+        options.EnableForHttps = true;
+    });
+
     // Add services to the container.
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
@@ -149,6 +154,7 @@ try
     app.UseExceptionHandler();
     app.UseHttpsRedirection();
     app.UseCors("AllowAll");
+    app.UseResponseCompression();
 
     app.UseStaticFiles(new StaticFileOptions
     {
@@ -157,6 +163,7 @@ try
             ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
             ctx.Context.Response.Headers.Append("Access-Control-Allow-Headers", "*");
             ctx.Context.Response.Headers.Append("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+            ctx.Context.Response.Headers.Append("Cache-Control", "public,max-age=604800,immutable");
         }
     });
 

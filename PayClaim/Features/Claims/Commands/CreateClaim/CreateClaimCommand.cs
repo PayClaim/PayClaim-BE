@@ -88,13 +88,28 @@ public class CreateClaimHandler(
 
         string? benefitName = null;
 
-        // 2. Simpan dalam transaksi Serializable untuk mencegah race condition kuota/anggaran
-        await using var tx = await context.Database.BeginTransactionAsync(
-            System.Data.IsolationLevel.Serializable,
-            ct);
+        // 2. Simpan file bukti pembayaran sebelum membuka transaksi DB agar lock tidak tertahan selama disk I/O
+        var filePath = string.Empty;
 
-        // Validasi berdasarkan jenis Claim
-        switch (request.ClaimType)
+        if (request.ReceiptFile != null &&
+            request.ReceiptFile.Length > 0)
+        {
+            filePath = await fileStorage.SaveFileAsync(
+                request.ReceiptFile,
+                "receipts",
+                ct);
+        }
+
+        Claim claim;
+        try
+        {
+            // 3. Simpan dalam transaksi Serializable untuk mencegah race condition kuota/anggaran
+            await using var tx = await context.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable,
+                ct);
+
+            // Validasi berdasarkan jenis Claim
+            switch (request.ClaimType)
         {
             case ClaimType.Benefit:
 
@@ -241,41 +256,39 @@ public class CreateClaimHandler(
                     "Invalid or unsupported claim type.");
         }
 
-        // 3. Simpan file bukti pembayaran jika tersedia
-        var filePath = string.Empty;
+            // 4. Buat Entity Claim
+            claim = new Claim
+            {
+                Id = Guid.NewGuid(),
+                ClaimType = request.ClaimType,
+                Description = request.Description,
+                TransactionDate = request.TransactionDate,
+                Amount = request.Amount,
+                SubmittedAt = DateTime.UtcNow.AddHours(7),
+                Status = ApprovalRouting.GetInitialClaimStatus(resolvedApproverRole),
+                FilePath = filePath,
 
-        if (request.ReceiptFile != null &&
-            request.ReceiptFile.Length > 0)
-        {
-            filePath = await fileStorage.SaveFileAsync(
-                request.ReceiptFile,
-                "receipts",
-                ct);
+                // Selalu menggunakan EmployeeId dari JWT
+                EmployeeId = employee.Id,
+
+                EmployeeBenefitId = request.EmployeeBenefitId,
+                TripProposalId = request.TripProposalId
+            };
+
+            await uow.Claims.AddAsync(claim, ct);
+
+            await uow.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
         }
-
-        // 4. Buat Entity Claim
-        var claim = new Claim
+        catch
         {
-            Id = Guid.NewGuid(),
-            ClaimType = request.ClaimType,
-            Description = request.Description,
-            TransactionDate = request.TransactionDate,
-            Amount = request.Amount,
-            SubmittedAt = DateTime.UtcNow.AddHours(7),
-            Status = ApprovalRouting.GetInitialClaimStatus(resolvedApproverRole),
-            FilePath = filePath,
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                fileStorage.DeleteFile(filePath);
+            }
 
-            // Selalu menggunakan EmployeeId dari JWT
-            EmployeeId = employee.Id,
-
-            EmployeeBenefitId = request.EmployeeBenefitId,
-            TripProposalId = request.TripProposalId
-        };
-
-        await uow.Claims.AddAsync(claim, ct);
-
-        await uow.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+            throw;
+        }
 
         // 5. Kirim notifikasi email ke approver berikutnya.
         if (ApprovalRouting.IsManagerStage(resolvedApproverRole))

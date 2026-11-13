@@ -43,5 +43,7 @@ public class TripProposalConfigurations
         builder.Property(tp => tp.FilePath)
             .HasColumnType("varchar(500)")
             .IsRequired();
+
+        builder.HasIndex(tp => new { tp.Status, tp.SubmittedAt });
     }
 }

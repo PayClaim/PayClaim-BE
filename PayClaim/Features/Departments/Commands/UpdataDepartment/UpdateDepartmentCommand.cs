@@ -1,13 +1,15 @@
 using MediatR;
+using Microsoft.Extensions.Caching.Memory;
 using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
+using PayClaim.Features.Departments.Queries.GetDepartment;
 
 namespace PayClaim.Features.Departments.Commands.UpdataDepartment;
 
 public record UpdateDepartmentCommand(string Id, UpdateDepartmentDto Request) : IRequest;
 
-public class UpdateDepartmentHandler(IUnitOfWork uow) : IRequestHandler<UpdateDepartmentCommand>
+public class UpdateDepartmentHandler(IUnitOfWork uow, IMemoryCache cache) : IRequestHandler<UpdateDepartmentCommand>
 {
     public async Task Handle(UpdateDepartmentCommand command, CancellationToken ct)
     {
@@ -42,5 +44,6 @@ public class UpdateDepartmentHandler(IUnitOfWork uow) : IRequestHandler<UpdateDe
         uow.Departments.Update(department);
 
         await uow.SaveChangesAsync(ct);
+        cache.Remove(GetDepartmentsHandler.CacheKey);
     }
 }

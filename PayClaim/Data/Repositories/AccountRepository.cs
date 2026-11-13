@@ -13,6 +13,7 @@ public class AccountRepository : Repository<Account>, IAccountRepository
     public async Task<Account?> GetByUsernameWithDetailsAsync(string username, CancellationToken ct = default)
     {
         return await _context.Accounts
+            .AsNoTracking()
             .Include(a => a.Employee)
                 .ThenInclude(e => e.Department)
             .Include(a => a.Employee)

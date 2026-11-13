@@ -1,12 +1,14 @@
 using MediatR;
+using Microsoft.Extensions.Caching.Memory;
 using PayClaim.Common.Exceptions;
 using PayClaim.Data.UnitOfWork;
+using PayClaim.Features.Departments.Queries.GetDepartment;
 
 namespace PayClaim.Features.Master.Departments.Commands.DeleteDepartment;
 
 public record DeleteDepartmentCommand(string Id) : IRequest;
 
-public class DeleteDepartmentHandler(IUnitOfWork uow) : IRequestHandler<DeleteDepartmentCommand>
+public class DeleteDepartmentHandler(IUnitOfWork uow, IMemoryCache cache) : IRequestHandler<DeleteDepartmentCommand>
 {
     public async Task Handle(
         DeleteDepartmentCommand command,
@@ -23,5 +25,6 @@ public class DeleteDepartmentHandler(IUnitOfWork uow) : IRequestHandler<DeleteDe
         uow.Departments.Delete(department);
 
         await uow.SaveChangesAsync(ct);
+        cache.Remove(GetDepartmentsHandler.CacheKey);
     }
 }

@@ -39,17 +39,30 @@ public class CreateTripProposalHandler(
                 "Akun Administrator tidak diperbolehkan mengajukan proposal perjalanan dinas.");
         }
 
-        // Jika pengaju adalah Manager, tahap approval Manager dilewati
-        // sehingga proposal langsung masuk ke Finance (UnderReview).
-        var submittedByManager = roles.Contains(
-            "Manager",
-            StringComparer.OrdinalIgnoreCase);
+        // Approver berikutnya = tepat satu tingkat di atas role pengaju.
+        var highestRole = ApprovalRouting.GetHighestBusinessRole(roles);
+        var nextApproverRole =
+            ApprovalRouting.GetNextApproverRole(highestRole);
 
         var submitterEmployee = await uow.Employees.GetByIdAsync(new object[] { submitterId }, ct);
         if (submitterEmployee != null && string.Equals(submitterEmployee.PositionId, "DIR", StringComparison.OrdinalIgnoreCase))
         {
             throw new ForbiddenException(
                 "Posisi Director tidak diperbolehkan mengajukan proposal perjalanan dinas.");
+        }
+
+        // Pastikan ada approver yang benar-benar bisa memproses pengajuan.
+        var (resolvedApproverRole, approvers) =
+            await context.ResolveNextApproversAsync(
+                nextApproverRole,
+                submitterId,
+                ct);
+
+        if (approvers.Count == 0)
+        {
+            throw new BusinessRuleException(
+                "Tidak ada approver yang tersedia untuk pengajuan ini. " +
+                "Pastikan atasan langsung atau akun Finance/Finance Manager/Admin aktif.");
         }
 
         var request = command.Request;
@@ -156,9 +169,7 @@ public class CreateTripProposalHandler(
 
             Description = request.Description,
             SubmittedAt = DateTime.UtcNow.AddHours(7),
-            Status = submittedByManager
-                ? TripProposalStatus.UnderReview
-                : TripProposalStatus.Submitted,
+            Status = ApprovalRouting.GetInitialTripStatus(resolvedApproverRole),
             FilePath = filePath
         };
 
@@ -178,53 +189,26 @@ public class CreateTripProposalHandler(
         await uow.TripProposals.AddAsync(proposal, ct);
         await uow.SaveChangesAsync(ct);
 
-        // Notifikasi email ke approver pertama.
-        // Jika pengaju Manager, tahap Manager dilewati -> langsung ke Finance.
+        // Notifikasi email ke approver berikutnya sesuai hirarki role.
         var submitterName = submitterEmployee?.FullName ?? "PIC";
-        var directManager = await context.GetDirectManagerAsync(submitterId, ct);
 
-        if (submittedByManager)
-        {
-            var financeUsers = (await context.GetActiveByRolesAsync(ct, "Finance"))
-                .Where(f => !string.Equals(
-                    f.Email, submitterEmployee?.Email, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            await Task.WhenAll(financeUsers.Select(fin =>
-                emailService.SendTripProposalActionRequiredEmailAsync(
-                    fin.Email,
-                    fin.Name,
-                    submitterName,
-                    proposal.Destination,
-                    proposal.StartDate,
-                    proposal.EndDate,
-                    proposal.TotalAmount,
-                    "Finance Verification",
-                    proposal.Id,
-                    null,
-                    ct)));
-        }
-        else
-        {
-            if (directManager != null)
-            {
-                await emailService.SendTripProposalActionRequiredEmailAsync(
-                    directManager.Email,
-                    directManager.Name,
-                    submitterName,
-                    proposal.Destination,
-                    proposal.StartDate,
-                    proposal.EndDate,
-                    proposal.TotalAmount,
-                    "Manager Approval",
-                    proposal.Id,
-                    null,
-                    ct);
-            }
-        }
+        await Task.WhenAll(approvers.Select(approver =>
+            emailService.SendTripProposalActionRequiredEmailAsync(
+                approver.Email,
+                approver.Name,
+                submitterName,
+                proposal.Destination,
+                proposal.StartDate,
+                proposal.EndDate,
+                proposal.TotalAmount,
+                resolvedApproverRole,
+                proposal.Id,
+                null,
+                ct)));
 
         // Saat Create semua limit peserta masih 0.
         decimal participantTotal = proposal.Participants.Sum(p => p.Amount);
+        var directManager = await context.GetDirectManagerAsync(submitterId, ct);
 
         return new TripProposalDetailDto
         {

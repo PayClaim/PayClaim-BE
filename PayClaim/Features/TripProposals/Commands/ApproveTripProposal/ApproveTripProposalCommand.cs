@@ -78,6 +78,9 @@ public class ApproveTripProposalHandler(
                 "Trip proposal does not have a PIC.");
         }
 
+        var picRoles = await context.GetRoleNamesAsync(pic.EmployeeId, ct);
+        var picHighestRole = ApprovalRouting.GetHighestBusinessRole(picRoles);
+
         if (pic.EmployeeId == approver.Id)
         {
             throw new ForbiddenException(
@@ -154,10 +157,17 @@ public class ApproveTripProposalHandler(
         // LEVEL 2: FINANCE
         else if (proposal.Status == TripProposalStatus.UnderReview)
         {
-            if (!hasFinanceRole && !hasAdminRole)
+            bool canVerifyFinance =
+                hasAdminRole ||
+                hasFinanceManagerRole ||
+                (hasFinanceRole &&
+                 (picHighestRole == ApprovalRouting.Employee ||
+                  picHighestRole == ApprovalRouting.Manager));
+
+            if (!canVerifyFinance)
             {
                 throw new ForbiddenException(
-                    "Only Finance or Admin can process this trip proposal.");
+                    "Only Finance (or a higher role) can process this trip proposal.");
             }
 
             currentLevel = 2;
@@ -245,7 +255,7 @@ public class ApproveTripProposalHandler(
                 bool exceedsFinanceLimit =
                     proposedTotalAmount > TripProposalApprovalLimit.FinanceLimit;
 
-                if (exceedsFinanceLimit)
+                if (exceedsFinanceLimit && !hasFinanceManagerRole)
                 {
                     nextStatus =
                         TripProposalStatus.FinanceManagerReview;
@@ -278,10 +288,15 @@ public class ApproveTripProposalHandler(
         else if (proposal.Status ==
                  TripProposalStatus.FinanceManagerReview)
         {
-            if (!hasFinanceManagerRole && !hasAdminRole)
+            bool canApproveAsFinanceManager =
+                hasAdminRole ||
+                (hasFinanceManagerRole &&
+                 picHighestRole != ApprovalRouting.FinanceManager);
+
+            if (!canApproveAsFinanceManager)
             {
                 throw new ForbiddenException(
-                    "Only Finance Manager or Admin can approve this trip proposal.");
+                    "Only Finance Manager (or Admin) can approve this trip proposal.");
             }
 
             currentLevel = 3;

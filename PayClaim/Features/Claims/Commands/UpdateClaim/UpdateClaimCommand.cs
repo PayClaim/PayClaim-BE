@@ -189,36 +189,47 @@ public class UpdateClaimHandler(
             claim.FilePath = await fileStorage.SaveFileAsync(request.ReceiptFile, "receipts", ct);
         }
 
-        // 6. Update properti klaim & kembalikan status ke Submitted (Resubmitted).
-        // Jika pengaju adalah Manager, tahap Manager tetap dilewati.
+        // 6. Update properti klaim & mulai ulang alur approval.
+        // Approver berikutnya mengikuti hirarki role (satu tingkat di atas pengaju).
         claim.ClaimType = request.ClaimType;
         claim.Description = request.Description;
         claim.TransactionDate = request.TransactionDate;
         claim.Amount = request.Amount;
 
-        var claimantIsManager = await context.HasRoleAsync(
-            claim.EmployeeId, "Manager", ct);
+        var claimantRoles = await context.GetRoleNamesAsync(
+            claim.EmployeeId,
+            ct);
+        var claimantHighestRole =
+            ApprovalRouting.GetHighestBusinessRole(claimantRoles);
+        var nextApproverRole =
+            ApprovalRouting.GetNextApproverRole(claimantHighestRole);
 
-        claim.Status = claimantIsManager
-            ? ClaimStatus.UnderReview
-            : ClaimStatus.Submitted;
+        var (resolvedApproverRole, approvers) =
+            await context.ResolveNextApproversAsync(
+                nextApproverRole,
+                claim.EmployeeId,
+                ct);
+
+        if (approvers.Count == 0)
+        {
+            throw new BusinessRuleException(
+                "Tidak ada approver yang tersedia untuk pengajuan ini. " +
+                "Pastikan atasan langsung atau akun Finance/Finance Manager/Admin aktif.");
+        }
+
+        claim.Status = ApprovalRouting.GetInitialClaimStatus(resolvedApproverRole);
         claim.SubmittedAt = DateTime.UtcNow.AddHours(7);
 
         uow.Claims.Update(claim);
         await uow.SaveChangesAsync(ct);
 
         // 6b. Notifikasi email ke approver berikutnya setelah revisi.
-        if (claimantIsManager)
+        if (ApprovalRouting.IsManagerStage(resolvedApproverRole))
         {
-            var financeUsers = (await context.GetActiveByRolesAsync(ct, "Finance"))
-                .Where(f => !string.Equals(
-                    f.Email, claim.Employee.Email, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            await Task.WhenAll(financeUsers.Select(fin =>
-                emailService.SendClaimSubmittedToFinanceEmailAsync(
-                    fin.Email,
-                    fin.Name,
+            await Task.WhenAll(approvers.Select(approver =>
+                emailService.SendClaimSubmittedToManagerEmailAsync(
+                    approver.Email,
+                    approver.Name,
                     claim.Employee.FullName,
                     claim.Employee.Number,
                     claim.Employee.Department?.Name ?? "-",
@@ -231,14 +242,10 @@ public class UpdateClaimHandler(
         }
         else
         {
-            var directManager = await context.GetDirectManagerAsync(
-                claim.EmployeeId, ct);
-
-            if (directManager != null)
-            {
-                await emailService.SendClaimSubmittedToManagerEmailAsync(
-                    directManager.Email,
-                    directManager.Name,
+            await Task.WhenAll(approvers.Select(approver =>
+                emailService.SendClaimSubmittedToFinanceEmailAsync(
+                    approver.Email,
+                    approver.Name,
                     claim.Employee.FullName,
                     claim.Employee.Number,
                     claim.Employee.Department?.Name ?? "-",
@@ -247,8 +254,8 @@ public class UpdateClaimHandler(
                     claim.Amount,
                     claim.SubmittedAt,
                     claim.Id,
-                    ct);
-            }
+                    resolvedApproverRole,
+                    ct)));
         }
 
         // 7. Ambil riwayat approval untuk detail DTO

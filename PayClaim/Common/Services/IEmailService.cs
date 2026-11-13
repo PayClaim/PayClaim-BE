@@ -62,6 +62,7 @@ public interface IEmailService
         decimal amount,
         DateTime submissionDate,
         Guid claimId,
+        string stageLabel = "Finance",
         CancellationToken ct = default);
 
     Task SendTripProposalActionRequiredEmailAsync(

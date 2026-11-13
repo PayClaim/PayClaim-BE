@@ -67,15 +67,38 @@ public class ApproveClaimHandler(
         // 3. Periksa apakah approver memiliki role yang sesuai
         bool isAdmin = approverRoles.Contains("Admin", StringComparer.OrdinalIgnoreCase);
         bool isFinanceManager = approverRoles.Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
+        bool isFinance = approverRoles.Contains("Finance", StringComparer.OrdinalIgnoreCase);
+        bool isManager = approverRoles.Contains("Manager", StringComparer.OrdinalIgnoreCase);
 
-        bool hasRequiredRole = isAdmin || (currentLevel == 1
-            ? (approverRoles.Contains("Manager", StringComparer.OrdinalIgnoreCase) || isFinanceManager)
-            : (approverRoles.Contains("Finance", StringComparer.OrdinalIgnoreCase) || isFinanceManager));
+        // Role tertinggi pengaju menentukan siapa yang boleh approve di level 2.
+        // Employee/Manager -> Finance atau Finance Manager
+        // Finance         -> Finance Manager (tidak boleh rekan Finance sendiri)
+        // Finance Manager -> SuperAdmin
+        var claimantRoles = await context.GetRoleNamesAsync(
+            claim.EmployeeId,
+            ct);
+        var claimantHighestRole =
+            ApprovalRouting.GetHighestBusinessRole(claimantRoles);
+
+        bool hasRequiredRole;
+        if (currentLevel == 1)
+        {
+            hasRequiredRole = isAdmin || isManager || isFinanceManager;
+        }
+        else
+        {
+            hasRequiredRole = claimantHighestRole switch
+            {
+                ApprovalRouting.FinanceManager => isAdmin,
+                ApprovalRouting.Finance => isFinanceManager || isAdmin,
+                _ => isFinance || isFinanceManager || isAdmin
+            };
+        }
 
         if (!hasRequiredRole)
         {
             throw new ForbiddenException(
-                $"Only {requiredRole} (or Admin/Finance Manager) can approve this claim at the current stage.");
+                $"Only {requiredRole} (or a higher role) can approve this claim at the current stage.");
         }
 
         // 4. Ambil Employee yang sedang melakukan approval

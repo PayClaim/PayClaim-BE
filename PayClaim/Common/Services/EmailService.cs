@@ -558,9 +558,14 @@ public class EmailService : IEmailService
         decimal amount,
         DateTime submissionDate,
         Guid claimId,
+        string stageLabel = "Finance",
         CancellationToken ct = default)
     {
-        var subject = $"[PayClaim] Klaim Baru Masuk Antrean Finance: {employeeName} - Rp {amount:N0}";
+        stageLabel = string.IsNullOrWhiteSpace(stageLabel)
+            ? "Finance"
+            : stageLabel;
+
+        var subject = $"[PayClaim] Klaim Membutuhkan Persetujuan {stageLabel}: {employeeName} - Rp {amount:N0}";
         var claimUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/claims/{claimId}";
         financeName = Enc(financeName);
         employeeName = Enc(employeeName);
@@ -568,6 +573,7 @@ public class EmailService : IEmailService
         departmentName = Enc(departmentName);
         claimType = Enc(claimType);
         claimDescription = Enc(claimDescription);
+        var stageLabelHtml = Enc(stageLabel);
 
         var html = $@"
 <!DOCTYPE html>
@@ -583,15 +589,15 @@ public class EmailService : IEmailService
                 <table width='600' border='0' cellspacing='0' cellpadding='0' style='max-width:600px; width:100%; background:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);'>
                     <tr>
                         <td style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:28px 36px; color:#ffffff;'>
-                            <div style='font-size:20px; font-weight:700;'>PayClaim - Notifikasi Antrean Finance</div>
-                            <div style='font-size:13px; color:#94a3b8; margin-top:4px;'>Pengajuan Klaim Memerlukan Verifikasi Finance</div>
+                            <div style='font-size:20px; font-weight:700;'>PayClaim - Notifikasi Persetujuan Klaim</div>
+                            <div style='font-size:13px; color:#94a3b8; margin-top:4px;'>Menunggu Tindakan: {stageLabelHtml}</div>
                         </td>
                     </tr>
                     <tr>
                         <td style='padding:36px;'>
                             <h3 style='margin:0 0 12px 0; color:#0f172a;'>Halo, {financeName}</h3>
                             <p style='margin:0 0 20px 0; font-size:15px; line-height:1.6; color:#475569;'>
-                                Pengajuan klaim reimbursement dari <strong>{employeeName}</strong> telah masuk ke antrean verifikasi Tim Finance. Pengajuan ini tidak melewati tahap approval Manager karena pengaju merupakan Manager.
+                                Pengajuan klaim reimbursement dari <strong>{employeeName}</strong> telah masuk ke antrean <strong>{stageLabelHtml}</strong> dan memerlukan verifikasi serta persetujuan Anda.
                             </p>
 
                             <div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin:24px 0;'>

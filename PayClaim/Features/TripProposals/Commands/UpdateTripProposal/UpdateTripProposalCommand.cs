@@ -121,14 +121,29 @@ public class UpdateTripProposalHandler(
             // Peserta tidak dikirim: limit peserta yang sudah ada dipertahankan.
         }
 
-        // Jika PIC adalah Manager, tahap approval Manager dilewati
-        // sehingga hasil revisi langsung masuk ke Finance.
-        var picIsManager = await context.HasRoleAsync(
-            currentPic.EmployeeId, "Manager", ct);
+        // Approver berikutnya mengikuti hirarki role (satu tingkat di atas PIC).
+        var picRoles = await context.GetRoleNamesAsync(
+            currentPic.EmployeeId,
+            ct);
+        var picHighestRole = ApprovalRouting.GetHighestBusinessRole(picRoles);
+        var nextApproverRole =
+            ApprovalRouting.GetNextApproverRole(picHighestRole);
 
-        proposal.Status = picIsManager
-            ? TripProposalStatus.UnderReview
-            : TripProposalStatus.Submitted;
+        var (resolvedApproverRole, approvers) =
+            await context.ResolveNextApproversAsync(
+                nextApproverRole,
+                currentPic.EmployeeId,
+                ct);
+
+        if (approvers.Count == 0)
+        {
+            throw new BusinessRuleException(
+                "Tidak ada approver yang tersedia untuk pengajuan ini. " +
+                "Pastikan atasan langsung atau akun Finance/Finance Manager/Admin aktif.");
+        }
+
+        proposal.Status =
+            ApprovalRouting.GetInitialTripStatus(resolvedApproverRole);
         proposal.SubmittedAt = DateTime.UtcNow.AddHours(7);
 
         uow.TripProposals.Update(proposal);
@@ -138,48 +153,20 @@ public class UpdateTripProposalHandler(
         var picName = currentPic.Employee?.FullName ?? "PIC";
         var proposalTotal = proposal.TotalAmount +
             proposal.Participants.Sum(p => p.Amount);
-        var directManager = await context.GetDirectManagerAsync(
-            currentPic.EmployeeId, ct);
 
-        if (picIsManager)
-        {
-            var financeUsers = (await context.GetActiveByRolesAsync(ct, "Finance"))
-                .Where(f => !string.Equals(
-                    f.Email, currentPic.Employee?.Email, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            await Task.WhenAll(financeUsers.Select(fin =>
-                emailService.SendTripProposalActionRequiredEmailAsync(
-                    fin.Email,
-                    fin.Name,
-                    picName,
-                    proposal.Destination,
-                    proposal.StartDate,
-                    proposal.EndDate,
-                    proposalTotal,
-                    "Finance Verification",
-                    proposal.Id,
-                    null,
-                    ct)));
-        }
-        else
-        {
-            if (directManager != null)
-            {
-                await emailService.SendTripProposalActionRequiredEmailAsync(
-                    directManager.Email,
-                    directManager.Name,
-                    picName,
-                    proposal.Destination,
-                    proposal.StartDate,
-                    proposal.EndDate,
-                    proposalTotal,
-                    "Manager Approval",
-                    proposal.Id,
-                    null,
-                    ct);
-            }
-        }
+        await Task.WhenAll(approvers.Select(approver =>
+            emailService.SendTripProposalActionRequiredEmailAsync(
+                approver.Email,
+                approver.Name,
+                picName,
+                proposal.Destination,
+                proposal.StartDate,
+                proposal.EndDate,
+                proposalTotal,
+                resolvedApproverRole,
+                proposal.Id,
+                null,
+                ct)));
 
         var approvals = await context.TripApprovals
             .Where(a => a.TripProposalId == proposal.Id)
@@ -195,6 +182,10 @@ public class UpdateTripProposalHandler(
                 DecidedAt = a.DecidedAt
             })
             .ToListAsync(ct);
+
+        var directManager = await context.GetDirectManagerAsync(
+            currentPic.EmployeeId,
+            ct);
 
         return new TripProposalDetailDto
         {

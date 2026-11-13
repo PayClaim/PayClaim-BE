@@ -36,11 +36,12 @@ public class CreateClaimHandler(
                 "Akun Administrator tidak diperbolehkan mengajukan klaim reimbursement.");
         }
 
-        // Jika pengaju adalah Manager, tahap approval Manager dilewati
-        // sehingga klaim langsung masuk ke Finance (UnderReview).
-        var submittedByManager = roles.Contains(
-            "Manager",
-            StringComparer.OrdinalIgnoreCase);
+        // Approver berikutnya = tepat satu tingkat di atas role pengaju.
+        // Employee -> Manager, Manager -> Finance, Finance -> Finance Manager,
+        // Finance Manager -> SuperAdmin.
+        var highestRole = ApprovalRouting.GetHighestBusinessRole(roles);
+        var nextApproverRole =
+            ApprovalRouting.GetNextApproverRole(highestRole);
 
         var request = command.Request;
 
@@ -68,6 +69,21 @@ public class CreateClaimHandler(
         {
             throw new BusinessRuleException(
                 "Inactive employees cannot submit claims.");
+        }
+
+        // Pastikan ada approver yang benar-benar bisa memproses pengajuan.
+        // Bila role yang dituju kosong, sistem otomatis naik ke level berikutnya.
+        var (resolvedApproverRole, approvers) =
+            await context.ResolveNextApproversAsync(
+                nextApproverRole,
+                employee.Id,
+                ct);
+
+        if (approvers.Count == 0)
+        {
+            throw new BusinessRuleException(
+                "Tidak ada approver yang tersedia untuk pengajuan ini. " +
+                "Pastikan atasan langsung atau akun Finance/Finance Manager/Admin aktif.");
         }
 
         string? benefitName = null;
@@ -241,9 +257,7 @@ public class CreateClaimHandler(
             TransactionDate = request.TransactionDate,
             Amount = request.Amount,
             SubmittedAt = DateTime.UtcNow.AddHours(7),
-            Status = submittedByManager
-                ? ClaimStatus.UnderReview
-                : ClaimStatus.Submitted,
+            Status = ApprovalRouting.GetInitialClaimStatus(resolvedApproverRole),
             FilePath = filePath,
 
             // Selalu menggunakan EmployeeId dari JWT
@@ -258,19 +272,12 @@ public class CreateClaimHandler(
         await uow.SaveChangesAsync(ct);
 
         // 5. Kirim notifikasi email ke approver berikutnya.
-        // Jika pengaju adalah Manager, tahap Manager dilewati sehingga
-        // notifikasi dikirim ke Tim Finance.
-        if (submittedByManager)
+        if (ApprovalRouting.IsManagerStage(resolvedApproverRole))
         {
-            var financeUsers = (await context.GetActiveByRolesAsync(ct, "Finance"))
-                .Where(f => !string.Equals(
-                    f.Email, employee.Email, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            await Task.WhenAll(financeUsers.Select(fin =>
-                emailService.SendClaimSubmittedToFinanceEmailAsync(
-                    fin.Email,
-                    fin.Name,
+            await Task.WhenAll(approvers.Select(approver =>
+                emailService.SendClaimSubmittedToManagerEmailAsync(
+                    approver.Email,
+                    approver.Name,
                     employee.FullName,
                     employee.Number,
                     employee.Department?.Name ?? "-",
@@ -281,21 +288,22 @@ public class CreateClaimHandler(
                     claim.Id,
                     ct)));
         }
-        else if (employee.Manager != null &&
-                 !string.IsNullOrWhiteSpace(employee.Manager.Email))
+        else
         {
-            await emailService.SendClaimSubmittedToManagerEmailAsync(
-                employee.Manager.Email,
-                employee.Manager.FullName,
-                employee.FullName,
-                employee.Number,
-                employee.Department?.Name ?? "-",
-                claim.ClaimType.ToString(),
-                claim.Description,
-                claim.Amount,
-                claim.SubmittedAt,
-                claim.Id,
-                ct);
+            await Task.WhenAll(approvers.Select(approver =>
+                emailService.SendClaimSubmittedToFinanceEmailAsync(
+                    approver.Email,
+                    approver.Name,
+                    employee.FullName,
+                    employee.Number,
+                    employee.Department?.Name ?? "-",
+                    claim.ClaimType.ToString(),
+                    claim.Description,
+                    claim.Amount,
+                    claim.SubmittedAt,
+                    claim.Id,
+                    resolvedApproverRole,
+                    ct)));
         }
 
         // 6. Buat Response

@@ -134,6 +134,9 @@ public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUse
                 BenefitName = c.EmployeeBenefit != null
                     ? c.EmployeeBenefit.Benefit.Name
                     : null,
+                TripProposalDestination = c.TripProposal != null
+                    ? c.TripProposal.Destination
+                    : null,
                 TripProposalDescription = c.TripProposal != null
                     ? c.TripProposal.Description
                     : null,

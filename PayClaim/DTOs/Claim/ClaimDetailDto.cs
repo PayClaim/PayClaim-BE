@@ -36,5 +36,9 @@ public class ClaimDetailDto
 
     public Guid? TripProposalId { get; set; }
 
+    public string? TripProposalDestination { get; set; }
+
+    public string? TripProposalDescription { get; set; }
+
     public List<ClaimApprovalHistoryDto> ApprovalHistory { get; set; } = new();
 }

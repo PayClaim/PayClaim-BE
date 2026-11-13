@@ -81,4 +81,16 @@ public static class ApprovalRouting
     public static bool IsFinanceManagerStage(string approverRole) =>
         string.Equals(approverRole, FinanceManager, StringComparison.OrdinalIgnoreCase) ||
         string.Equals(approverRole, SuperAdmin, StringComparison.OrdinalIgnoreCase);
+
+    public static bool CanProcessLevel2Claim(
+        string claimantHighestRole,
+        bool isAdmin,
+        bool isFinanceManager,
+        bool isFinance) =>
+        claimantHighestRole switch
+        {
+            FinanceManager => isAdmin,
+            Finance => isFinanceManager || isAdmin,
+            _ => isFinance || isFinanceManager || isAdmin
+        };
 }

@@ -87,12 +87,8 @@ public class ApproveClaimHandler(
         }
         else
         {
-            hasRequiredRole = claimantHighestRole switch
-            {
-                ApprovalRouting.FinanceManager => isAdmin,
-                ApprovalRouting.Finance => isFinanceManager || isAdmin,
-                _ => isFinance || isFinanceManager || isAdmin
-            };
+            hasRequiredRole = ApprovalRouting.CanProcessLevel2Claim(
+                claimantHighestRole, isAdmin, isFinanceManager, isFinance);
         }
 
         if (!hasRequiredRole)
@@ -150,6 +146,20 @@ public class ApproveClaimHandler(
             }
         }
 
+        var expectedCurrentStatus = claim.Status;
+        var approvalRecord = new ClaimApproval
+        {
+            ClaimId = claim.Id,
+            ApproverId = approver.Id,
+            ApproverName = approver.FullName,
+            Decision = ApprovalDecision.Approved,
+            Notes = command.Request.Notes,
+            ApprovalLevel = currentLevel,
+            DecidedAt = DateTime.UtcNow.AddHours(7)
+        };
+
+        await using var tx = await context.Database.BeginTransactionAsync(ct);
+
         // 6. Jika Finance menyetujui Benefit Claim, potong saldo Benefit
         if (currentLevel == 2 &&
             claim.ClaimType == ClaimType.Benefit)
@@ -190,29 +200,29 @@ public class ApproveClaimHandler(
             }
         }
 
-        // 7. Update status Claim
+        // 7. Update status Claim secara atomik agar tidak diproses ganda
+        var updatedClaimRows = await context.Claims
+            .Where(c => c.Id == claim.Id && c.Status == expectedCurrentStatus)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(c => c.Status, nextStatus),
+                ct);
+
+        if (updatedClaimRows == 0)
+        {
+            throw new ConflictException(
+                "Claim status has already been updated by another approver.");
+        }
+
         claim.Status = nextStatus;
 
-        uow.Claims.Update(claim);
-
         // 8. Simpan riwayat approval
-        var approvalRecord = new ClaimApproval
-        {
-            ClaimId = claim.Id,
-            ApproverId = approver.Id,
-            ApproverName = approver.FullName,
-            Decision = ApprovalDecision.Approved,
-            Notes = command.Request.Notes,
-            ApprovalLevel = currentLevel,
-            DecidedAt = DateTime.UtcNow.AddHours(7)
-        };
-
         await uow.ClaimApprovals.AddAsync(
             approvalRecord,
             ct);
 
-        // 9. Simpan seluruh perubahan
+        // 9. Simpan seluruh perubahan dan commit transaksi
         await uow.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
         // 10. Ambil data pengaju klaim (claimant) untuk kirim email notifikasi
         var claimantEmp = await context.Employees

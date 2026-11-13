@@ -88,7 +88,12 @@ public class CreateClaimHandler(
 
         string? benefitName = null;
 
-        // 2. Validasi berdasarkan jenis Claim
+        // 2. Simpan dalam transaksi Serializable untuk mencegah race condition kuota/anggaran
+        await using var tx = await context.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable,
+            ct);
+
+        // Validasi berdasarkan jenis Claim
         switch (request.ClaimType)
         {
             case ClaimType.Benefit:
@@ -270,6 +275,7 @@ public class CreateClaimHandler(
         await uow.Claims.AddAsync(claim, ct);
 
         await uow.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
         // 5. Kirim notifikasi email ke approver berikutnya.
         if (ApprovalRouting.IsManagerStage(resolvedApproverRole))

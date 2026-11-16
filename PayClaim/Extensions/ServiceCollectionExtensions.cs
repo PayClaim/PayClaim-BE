@@ -15,7 +15,7 @@ public static class ServiceCollectionExtensions
         IConfiguration config)
     {
         // Database
-        services.AddDbContextPool<PayClaimDbContext>(options =>
+        services.AddDbContext<PayClaimDbContext>(options =>
             options.UseSqlServer(config.GetConnectionString("DefaultConnection")));
 
         // Caching

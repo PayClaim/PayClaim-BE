@@ -154,7 +154,6 @@ try
     app.UseExceptionHandler();
     app.UseHttpsRedirection();
     app.UseCors("AllowAll");
-    app.UseResponseCompression();
 
     app.UseStaticFiles(new StaticFileOptions
     {
@@ -163,7 +162,6 @@ try
             ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
             ctx.Context.Response.Headers.Append("Access-Control-Allow-Headers", "*");
             ctx.Context.Response.Headers.Append("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-            ctx.Context.Response.Headers.Append("Cache-Control", "public,max-age=604800,immutable");
         }
     });
 

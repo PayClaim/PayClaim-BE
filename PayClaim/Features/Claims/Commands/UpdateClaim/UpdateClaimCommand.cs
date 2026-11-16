@@ -18,6 +18,7 @@ public class UpdateClaimHandler(
     IUnitOfWork uow,
     PayClaimDbContext context,
     IFileStorageService fileStorage,
+    IEmailService emailService,
     ICurrentUser currentUser) : IRequestHandler<UpdateClaimCommand, ClaimDetailDto>
 {
     public async Task<ClaimDetailDto> Handle(UpdateClaimCommand command, CancellationToken ct = default)
@@ -188,16 +189,74 @@ public class UpdateClaimHandler(
             claim.FilePath = await fileStorage.SaveFileAsync(request.ReceiptFile, "receipts", ct);
         }
 
-        // 6. Update properti klaim & kembalikan status ke Submitted (Resubmitted)
+        // 6. Update properti klaim & mulai ulang alur approval.
+        // Approver berikutnya mengikuti hirarki role (satu tingkat di atas pengaju).
         claim.ClaimType = request.ClaimType;
         claim.Description = request.Description;
         claim.TransactionDate = request.TransactionDate;
         claim.Amount = request.Amount;
-        claim.Status = ClaimStatus.Submitted;
+
+        var claimantRoles = await context.GetRoleNamesAsync(
+            claim.EmployeeId,
+            ct);
+        var claimantHighestRole =
+            ApprovalRouting.GetHighestBusinessRole(claimantRoles);
+        var nextApproverRole =
+            ApprovalRouting.GetNextApproverRole(claimantHighestRole);
+
+        var (resolvedApproverRole, approvers) =
+            await context.ResolveNextApproversAsync(
+                nextApproverRole,
+                claim.EmployeeId,
+                ct);
+
+        if (approvers.Count == 0)
+        {
+            throw new BusinessRuleException(
+                "Tidak ada approver yang tersedia untuk pengajuan ini. " +
+                "Pastikan atasan langsung atau akun Finance/Finance Manager/Admin aktif.");
+        }
+
+        claim.Status = ApprovalRouting.GetInitialClaimStatus(resolvedApproverRole);
         claim.SubmittedAt = DateTime.UtcNow.AddHours(7);
 
         uow.Claims.Update(claim);
         await uow.SaveChangesAsync(ct);
+
+        // 6b. Notifikasi email ke approver berikutnya setelah revisi.
+        if (ApprovalRouting.IsManagerStage(resolvedApproverRole))
+        {
+            await Task.WhenAll(approvers.Select(approver =>
+                emailService.SendClaimSubmittedToManagerEmailAsync(
+                    approver.Email,
+                    approver.Name,
+                    claim.Employee.FullName,
+                    claim.Employee.Number,
+                    claim.Employee.Department?.Name ?? "-",
+                    claim.ClaimType.ToString(),
+                    claim.Description,
+                    claim.Amount,
+                    claim.SubmittedAt,
+                    claim.Id,
+                    ct)));
+        }
+        else
+        {
+            await Task.WhenAll(approvers.Select(approver =>
+                emailService.SendClaimSubmittedToFinanceEmailAsync(
+                    approver.Email,
+                    approver.Name,
+                    claim.Employee.FullName,
+                    claim.Employee.Number,
+                    claim.Employee.Department?.Name ?? "-",
+                    claim.ClaimType.ToString(),
+                    claim.Description,
+                    claim.Amount,
+                    claim.SubmittedAt,
+                    claim.Id,
+                    resolvedApproverRole,
+                    ct)));
+        }
 
         // 7. Ambil riwayat approval untuk detail DTO
         var approvalHistory = await context.ClaimApprovals

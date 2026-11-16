@@ -28,6 +28,8 @@ public class TripProposalDetailDto
 
     public string FilePath { get; set; } = string.Empty;
 
+    public string? ManagerName { get; set; }
+
     public List<ParticipantItemDto> Participants { get; set; } = new();
 
     public List<TripApprovalHistoryDto> ApprovalHistory { get; set; } = new();

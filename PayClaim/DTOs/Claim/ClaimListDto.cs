@@ -24,6 +24,8 @@ public class ClaimListDto
 
     public string? BenefitName { get; set; }
 
+    public string? TripProposalDestination { get; set; }
+
     public string? TripProposalDescription { get; set; }
 
     public string? FilePath { get; set; }

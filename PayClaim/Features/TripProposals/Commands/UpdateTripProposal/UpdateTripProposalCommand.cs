@@ -18,6 +18,7 @@ public class UpdateTripProposalHandler(
     IUnitOfWork uow,
     PayClaimDbContext context,
     IFileStorageService fileStorage,
+    IEmailService emailService,
     ICurrentUser currentUser,
     IHttpContextAccessor httpContextAccessor) : IRequestHandler<UpdateTripProposalCommand, TripProposalDetailDto>
 {
@@ -120,14 +121,52 @@ public class UpdateTripProposalHandler(
             // Peserta tidak dikirim: limit peserta yang sudah ada dipertahankan.
         }
 
-        // Perbarui waktu submission ketika proposal diajukan ulang.
-        proposal.SubmittedAt = DateTime.UtcNow.AddHours(7);
+        // Approver berikutnya mengikuti hirarki role (satu tingkat di atas PIC).
+        var picRoles = await context.GetRoleNamesAsync(
+            currentPic.EmployeeId,
+            ct);
+        var picHighestRole = ApprovalRouting.GetHighestBusinessRole(picRoles);
+        var nextApproverRole =
+            ApprovalRouting.GetNextApproverRole(picHighestRole);
 
-        proposal.Status = TripProposalStatus.Submitted;
-        proposal.SubmittedAt = DateTime.UtcNow;   // tambahkan ini
+        var (resolvedApproverRole, approvers) =
+            await context.ResolveNextApproversAsync(
+                nextApproverRole,
+                currentPic.EmployeeId,
+                ct);
+
+        if (approvers.Count == 0)
+        {
+            throw new BusinessRuleException(
+                "Tidak ada approver yang tersedia untuk pengajuan ini. " +
+                "Pastikan atasan langsung atau akun Finance/Finance Manager/Admin aktif.");
+        }
+
+        proposal.Status =
+            ApprovalRouting.GetInitialTripStatus(resolvedApproverRole);
+        proposal.SubmittedAt = DateTime.UtcNow.AddHours(7);
 
         uow.TripProposals.Update(proposal);
         await uow.SaveChangesAsync(ct);
+
+        // Notifikasi email ke approver berikutnya setelah revisi diajukan ulang.
+        var picName = currentPic.Employee?.FullName ?? "PIC";
+        var proposalTotal = proposal.TotalAmount +
+            proposal.Participants.Sum(p => p.Amount);
+
+        await Task.WhenAll(approvers.Select(approver =>
+            emailService.SendTripProposalActionRequiredEmailAsync(
+                approver.Email,
+                approver.Name,
+                picName,
+                proposal.Destination,
+                proposal.StartDate,
+                proposal.EndDate,
+                proposalTotal,
+                resolvedApproverRole,
+                proposal.Id,
+                null,
+                ct)));
 
         var approvals = await context.TripApprovals
             .Where(a => a.TripProposalId == proposal.Id)
@@ -144,6 +183,10 @@ public class UpdateTripProposalHandler(
             })
             .ToListAsync(ct);
 
+        var directManager = await context.GetDirectManagerAsync(
+            currentPic.EmployeeId,
+            ct);
+
         return new TripProposalDetailDto
         {
             Id = proposal.Id,
@@ -155,6 +198,7 @@ public class UpdateTripProposalHandler(
             Description = proposal.Description,
             Status = proposal.Status,
             FilePath = proposal.FilePath,
+            ManagerName = directManager?.Name,
             Participants = proposal.Participants.Select(p => new ParticipantItemDto
             {
                 EmployeeId = p.EmployeeId,

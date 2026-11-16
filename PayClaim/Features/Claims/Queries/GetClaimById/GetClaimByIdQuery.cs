@@ -104,7 +104,13 @@ public class GetClaimByIdHandler(PayClaimDbContext context, ICurrentUser current
                     ? c.EmployeeBenefit.Benefit.Name
                     : null,
 
-                TripProposalId = c.TripProposalId
+                TripProposalId = c.TripProposalId,
+                TripProposalDestination = c.TripProposal != null
+                    ? c.TripProposal.Destination
+                    : null,
+                TripProposalDescription = c.TripProposal != null
+                    ? c.TripProposal.Description
+                    : null
             })
             .FirstOrDefaultAsync(ct);
 

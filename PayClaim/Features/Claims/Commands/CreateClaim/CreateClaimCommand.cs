@@ -36,6 +36,13 @@ public class CreateClaimHandler(
                 "Akun Administrator tidak diperbolehkan mengajukan klaim reimbursement.");
         }
 
+        // Approver berikutnya = tepat satu tingkat di atas role pengaju.
+        // Employee -> Manager, Manager -> Finance, Finance -> Finance Manager,
+        // Finance Manager -> SuperAdmin.
+        var highestRole = ApprovalRouting.GetHighestBusinessRole(roles);
+        var nextApproverRole =
+            ApprovalRouting.GetNextApproverRole(highestRole);
+
         var request = command.Request;
 
         // 1. Ambil Employee beserta Manager dan Departemen berdasarkan EmployeeId dari JWT
@@ -64,9 +71,29 @@ public class CreateClaimHandler(
                 "Inactive employees cannot submit claims.");
         }
 
+        // Pastikan ada approver yang benar-benar bisa memproses pengajuan.
+        // Bila role yang dituju kosong, sistem otomatis naik ke level berikutnya.
+        var (resolvedApproverRole, approvers) =
+            await context.ResolveNextApproversAsync(
+                nextApproverRole,
+                employee.Id,
+                ct);
+
+        if (approvers.Count == 0)
+        {
+            throw new BusinessRuleException(
+                "Tidak ada approver yang tersedia untuk pengajuan ini. " +
+                "Pastikan atasan langsung atau akun Finance/Finance Manager/Admin aktif.");
+        }
+
         string? benefitName = null;
 
-        // 2. Validasi berdasarkan jenis Claim
+        // 2. Simpan dalam transaksi Serializable untuk mencegah race condition kuota/anggaran
+        await using var tx = await context.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable,
+            ct);
+
+        // Validasi berdasarkan jenis Claim
         switch (request.ClaimType)
         {
             case ClaimType.Benefit:
@@ -235,7 +262,7 @@ public class CreateClaimHandler(
             TransactionDate = request.TransactionDate,
             Amount = request.Amount,
             SubmittedAt = DateTime.UtcNow.AddHours(7),
-            Status = ClaimStatus.Submitted,
+            Status = ApprovalRouting.GetInitialClaimStatus(resolvedApproverRole),
             FilePath = filePath,
 
             // Selalu menggunakan EmployeeId dari JWT
@@ -248,22 +275,41 @@ public class CreateClaimHandler(
         await uow.Claims.AddAsync(claim, ct);
 
         await uow.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
-        // 5. Kirim notifikasi email ke Atasan Langsung (Manager) jika ada
-        if (employee.Manager != null && !string.IsNullOrWhiteSpace(employee.Manager.Email))
+        // 5. Kirim notifikasi email ke approver berikutnya.
+        if (ApprovalRouting.IsManagerStage(resolvedApproverRole))
         {
-            await emailService.SendClaimSubmittedToManagerEmailAsync(
-                employee.Manager.Email,
-                employee.Manager.FullName,
-                employee.FullName,
-                employee.Number,
-                employee.Department?.Name ?? "-",
-                claim.ClaimType.ToString(),
-                claim.Description,
-                claim.Amount,
-                claim.SubmittedAt,
-                claim.Id,
-                ct);
+            await Task.WhenAll(approvers.Select(approver =>
+                emailService.SendClaimSubmittedToManagerEmailAsync(
+                    approver.Email,
+                    approver.Name,
+                    employee.FullName,
+                    employee.Number,
+                    employee.Department?.Name ?? "-",
+                    claim.ClaimType.ToString(),
+                    claim.Description,
+                    claim.Amount,
+                    claim.SubmittedAt,
+                    claim.Id,
+                    ct)));
+        }
+        else
+        {
+            await Task.WhenAll(approvers.Select(approver =>
+                emailService.SendClaimSubmittedToFinanceEmailAsync(
+                    approver.Email,
+                    approver.Name,
+                    employee.FullName,
+                    employee.Number,
+                    employee.Department?.Name ?? "-",
+                    claim.ClaimType.ToString(),
+                    claim.Description,
+                    claim.Amount,
+                    claim.SubmittedAt,
+                    claim.Id,
+                    resolvedApproverRole,
+                    ct)));
         }
 
         // 6. Buat Response

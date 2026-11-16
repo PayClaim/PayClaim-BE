@@ -77,10 +77,22 @@ public class RejectClaimHandler(
         // 4. Pastikan approver memiliki role yang sesuai.
         bool isAdmin = approverRoles.Contains("Admin", StringComparer.OrdinalIgnoreCase);
         bool isFinanceManager = approverRoles.Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
+        bool isFinance = approverRoles.Contains("Finance", StringComparer.OrdinalIgnoreCase);
 
-        bool hasRequiredRole = isAdmin || (currentLevel == 1
-            ? (approverRoles.Contains("Manager", StringComparer.OrdinalIgnoreCase) || isFinanceManager)
-            : (approverRoles.Contains("Finance", StringComparer.OrdinalIgnoreCase) || isFinanceManager));
+        bool hasRequiredRole;
+        if (currentLevel == 1)
+        {
+            hasRequiredRole = isAdmin ||
+                approverRoles.Contains("Manager", StringComparer.OrdinalIgnoreCase) ||
+                isFinanceManager;
+        }
+        else
+        {
+            var claimantRoles = await context.GetRoleNamesAsync(claim.EmployeeId, ct);
+            var claimantHighestRole = ApprovalRouting.GetHighestBusinessRole(claimantRoles);
+            hasRequiredRole = ApprovalRouting.CanProcessLevel2Claim(
+                claimantHighestRole, isAdmin, isFinanceManager, isFinance);
+        }
 
         if (!hasRequiredRole)
         {

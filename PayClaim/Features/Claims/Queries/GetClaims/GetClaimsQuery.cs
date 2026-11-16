@@ -103,6 +103,18 @@ public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUse
         if (filter.EndDate.HasValue)
             dbQuery = dbQuery.Where(c => c.TransactionDate <= filter.EndDate.Value);
 
+        // Filter pencarian teks
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var s = filter.Search.Trim();
+            dbQuery = dbQuery.Where(c =>
+                (c.Description != null && c.Description.Contains(s)) ||
+                c.Employee.FullName.Contains(s) ||
+                (c.EmployeeBenefit != null && c.EmployeeBenefit.Benefit.Name.Contains(s)) ||
+                (c.TripProposal != null && c.TripProposal.Destination.Contains(s)) ||
+                (c.TripProposal != null && c.TripProposal.Description != null && c.TripProposal.Description.Contains(s)));
+        }
+
         var orderedQuery = dbQuery.OrderByDescending(c => c.SubmittedAt);
 
         var totalCount = await orderedQuery.CountAsync(ct);
@@ -123,6 +135,9 @@ public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUse
                 EmployeeName = c.Employee.FullName,
                 BenefitName = c.EmployeeBenefit != null
                     ? c.EmployeeBenefit.Benefit.Name
+                    : null,
+                TripProposalDestination = c.TripProposal != null
+                    ? c.TripProposal.Destination
                     : null,
                 TripProposalDescription = c.TripProposal != null
                     ? c.TripProposal.Description

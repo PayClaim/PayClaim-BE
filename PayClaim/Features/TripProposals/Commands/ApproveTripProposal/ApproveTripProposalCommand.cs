@@ -78,6 +78,9 @@ public class ApproveTripProposalHandler(
                 "Trip proposal does not have a PIC.");
         }
 
+        var picRoles = await context.GetRoleNamesAsync(pic.EmployeeId, ct);
+        var picHighestRole = ApprovalRouting.GetHighestBusinessRole(picRoles);
+
         if (pic.EmployeeId == approver.Id)
         {
             throw new ForbiddenException(
@@ -154,10 +157,17 @@ public class ApproveTripProposalHandler(
         // LEVEL 2: FINANCE
         else if (proposal.Status == TripProposalStatus.UnderReview)
         {
-            if (!hasFinanceRole && !hasAdminRole)
+            bool canVerifyFinance =
+                hasAdminRole ||
+                hasFinanceManagerRole ||
+                (hasFinanceRole &&
+                 (picHighestRole == ApprovalRouting.Employee ||
+                  picHighestRole == ApprovalRouting.Manager));
+
+            if (!canVerifyFinance)
             {
                 throw new ForbiddenException(
-                    "Only Finance or Admin can process this trip proposal.");
+                    "Only Finance (or a higher role) can process this trip proposal.");
             }
 
             currentLevel = 2;
@@ -245,7 +255,7 @@ public class ApproveTripProposalHandler(
                 bool exceedsFinanceLimit =
                     proposedTotalAmount > TripProposalApprovalLimit.FinanceLimit;
 
-                if (exceedsFinanceLimit)
+                if (exceedsFinanceLimit && !hasFinanceManagerRole)
                 {
                     nextStatus =
                         TripProposalStatus.FinanceManagerReview;
@@ -278,10 +288,15 @@ public class ApproveTripProposalHandler(
         else if (proposal.Status ==
                  TripProposalStatus.FinanceManagerReview)
         {
-            if (!hasFinanceManagerRole && !hasAdminRole)
+            bool canApproveAsFinanceManager =
+                hasAdminRole ||
+                (hasFinanceManagerRole &&
+                 picHighestRole != ApprovalRouting.FinanceManager);
+
+            if (!canApproveAsFinanceManager)
             {
                 throw new ForbiddenException(
-                    "Only Finance Manager or Admin can approve this trip proposal.");
+                    "Only Finance Manager (or Admin) can approve this trip proposal.");
             }
 
             currentLevel = 3;
@@ -359,24 +374,76 @@ public class ApproveTripProposalHandler(
             .FirstOrDefault(p => p.IsPic)
             ?? proposal.Participants.FirstOrDefault();
 
-        if (picParticipant != null)
-        {
-            var picEmp = await uow.Employees.GetByIdAsync(
-                new object[] { picParticipant.EmployeeId },
-                ct);
+        var picEmp = picParticipant?.Employee;
+        var picName = picEmp?.FullName ?? "PIC";
+        var proposalTotal = proposal.TotalAmount +
+            proposal.Participants.Sum(p => p.Amount);
 
-            if (picEmp != null &&
-                !string.IsNullOrWhiteSpace(picEmp.Email))
-            {
-                await emailService.SendTripProposalStatusEmailAsync(
-                    picEmp.Email,
-                    picEmp.FullName,
+        if (picEmp != null &&
+            !string.IsNullOrWhiteSpace(picEmp.Email))
+        {
+            await emailService.SendTripProposalStatusEmailAsync(
+                picEmp.Email,
+                picEmp.FullName,
+                proposal.Destination,
+                proposal.Status.ToString(),
+                approver.FullName,
+                command.Request.Notes,
+                proposal.Id,
+                ct);
+        }
+
+        // Notifikasi ke approver berikutnya sesuai status hasil keputusan.
+        if (proposal.Status == TripProposalStatus.UnderReview)
+        {
+            // Manager sudah menyetujui -> masuk antrean Finance.
+            var financeUsers = (await context.GetActiveByRolesAsync(
+                    ct, "Finance"))
+                .Where(f => !string.Equals(
+                    f.Email, approver.Email, StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(
+                        f.Email, picEmp?.Email, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            await Task.WhenAll(financeUsers.Select(fin =>
+                emailService.SendTripProposalActionRequiredEmailAsync(
+                    fin.Email,
+                    fin.Name,
+                    picName,
                     proposal.Destination,
-                    proposal.Status.ToString(),
-                    approver.FullName,
+                    proposal.StartDate,
+                    proposal.EndDate,
+                    proposalTotal,
+                    "Finance Verification",
+                    proposal.Id,
                     command.Request.Notes,
-                    ct);
-            }
+                    ct)));
+        }
+        else if (proposal.Status ==
+                 TripProposalStatus.FinanceManagerReview)
+        {
+            // Nominal melebihi limit Finance -> menunggu Finance Manager.
+            var financeManagers = (await context.GetActiveByRolesAsync(
+                    ct, "Finance Manager"))
+                .Where(f => !string.Equals(
+                    f.Email, approver.Email, StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(
+                        f.Email, picEmp?.Email, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            await Task.WhenAll(financeManagers.Select(fm =>
+                emailService.SendTripProposalActionRequiredEmailAsync(
+                    fm.Email,
+                    fm.Name,
+                    picName,
+                    proposal.Destination,
+                    proposal.StartDate,
+                    proposal.EndDate,
+                    proposalTotal,
+                    "Finance Manager Approval",
+                    proposal.Id,
+                    command.Request.Notes,
+                    ct)));
         }
 
         return new TripApprovalHistoryDto

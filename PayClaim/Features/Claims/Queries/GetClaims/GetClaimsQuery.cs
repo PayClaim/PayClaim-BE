@@ -31,9 +31,12 @@ public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUse
             .AsQueryable();
 
         bool isAdmin = roles.Contains("Admin", StringComparer.OrdinalIgnoreCase);
+
         bool isManager = roles.Contains("Manager", StringComparer.OrdinalIgnoreCase);
-        bool isFinance = roles.Contains("Finance", StringComparer.OrdinalIgnoreCase)
-                      || roles.Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
+
+        bool isFinance =
+            roles.Contains("Finance", StringComparer.OrdinalIgnoreCase) ||
+            roles.Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
 
         if (query.IsMyClaims)
         {
@@ -52,17 +55,7 @@ public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUse
 
             var requesterEmployeeId = employeeId.Value;
 
-            HashSet<Guid> approvedByRequesterClaimIds = [];
             HashSet<Guid> financeVisibleClaimIds = [];
-
-            if (isManager)
-            {
-                approvedByRequesterClaimIds = await context.ClaimApprovals
-                    .AsNoTracking()
-                    .Where(ca => ca.ApproverId == requesterEmployeeId)
-                    .Select(ca => ca.ClaimId)
-                    .ToHashSetAsync(ct);
-            }
 
             if (isFinance)
             {
@@ -76,10 +69,7 @@ public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUse
             dbQuery = dbQuery.Where(c =>
                 (
                     isManager &&
-                    (
-                        c.Employee.ManagerId == requesterEmployeeId ||
-                        approvedByRequesterClaimIds.Contains(c.Id)
-                    )
+                    c.Employee.ManagerId == requesterEmployeeId
                 )
                 ||
                 (

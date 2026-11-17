@@ -69,7 +69,7 @@ public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUse
                 (
                     isFinance &&
                     (
-                        c.Status == ClaimStatus.UnderReview ||
+                            c.Status == ClaimStatus.UnderReview ||
                         c.Status == ClaimStatus.Approved ||
                         c.Status == ClaimStatus.Paid ||
                         context.ClaimApprovals.Any(ca =>

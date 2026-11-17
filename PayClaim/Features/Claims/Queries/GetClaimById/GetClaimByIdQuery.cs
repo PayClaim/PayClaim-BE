@@ -52,26 +52,28 @@ public class GetClaimByIdHandler(PayClaimDbContext context, ICurrentUser current
             employeeId.HasValue &&
             claimAccess.ManagerId == employeeId.Value;
 
-        var hasApproved = employeeId.HasValue &&
-            await context.ClaimApprovals
-                .AsNoTracking()
-                .AnyAsync(ca => ca.ClaimId == query.Id && ca.ApproverId == employeeId.Value, ct);
-
-        var isFinanceEligible = isFinance && (
-            claimAccess.Status == ClaimStatus.UnderReview ||
-            claimAccess.Status == ClaimStatus.Approved ||
-            claimAccess.Status == ClaimStatus.Paid ||
-            await context.ClaimApprovals
-                .AsNoTracking()
-                .AnyAsync(ca => ca.ClaimId == query.Id && ca.ApprovalLevel >= 2, ct)
-        );
-
         var hasAccess =
             isAdmin ||
             isOwner ||
-            isManagerOfOwner ||
-            hasApproved ||
-            isFinanceEligible;
+            isManagerOfOwner;
+
+        if (!hasAccess && employeeId.HasValue)
+        {
+            hasAccess = await context.ClaimApprovals
+                .AsNoTracking()
+                .AnyAsync(ca => ca.ClaimId == query.Id && ca.ApproverId == employeeId.Value, ct);
+        }
+
+        if (!hasAccess && isFinance)
+        {
+            hasAccess =
+                claimAccess.Status == ClaimStatus.UnderReview ||
+                claimAccess.Status == ClaimStatus.Approved ||
+                claimAccess.Status == ClaimStatus.Paid ||
+                await context.ClaimApprovals
+                    .AsNoTracking()
+                    .AnyAsync(ca => ca.ClaimId == query.Id && ca.ApprovalLevel >= 2, ct);
+        }
 
         if (!hasAccess)
         {

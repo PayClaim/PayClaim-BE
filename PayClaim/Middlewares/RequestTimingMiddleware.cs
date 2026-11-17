@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace PayClaim.Middlewares;
 
 public class RequestTimingMiddleware(ILogger<RequestTimingMiddleware> logger) : IMiddleware
@@ -8,8 +6,6 @@ public class RequestTimingMiddleware(ILogger<RequestTimingMiddleware> logger) : 
 
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
-        var stopwatch = Stopwatch.StartNew();
-
         var correlationId = context.Request.Headers[CorrelationHeader].FirstOrDefault();
         if (string.IsNullOrWhiteSpace(correlationId))
         {
@@ -29,7 +25,5 @@ public class RequestTimingMiddleware(ILogger<RequestTimingMiddleware> logger) : 
         {
             await next(context);
         }
-
-        stopwatch.Stop();
     }
 }

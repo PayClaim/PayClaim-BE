@@ -40,5 +40,8 @@ public class ClaimApprovalConfigurations
             .WithMany()
             .HasForeignKey(ca => ca.ApproverId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(ca => new { ca.ClaimId, ca.ApproverId });
+        builder.HasIndex(ca => new { ca.ClaimId, ca.ApprovalLevel });
     }
 }

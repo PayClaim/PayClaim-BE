@@ -18,6 +18,9 @@ public static class ServiceCollectionExtensions
         services.AddDbContext<PayClaimDbContext>(options =>
             options.UseSqlServer(config.GetConnectionString("DefaultConnection")));
 
+        // Caching
+        services.AddMemoryCache();
+
         // HTTP Context Accessor & Current User
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();

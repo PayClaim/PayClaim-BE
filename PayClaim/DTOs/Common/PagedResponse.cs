@@ -1,4 +1,15 @@
+using System.Text.Json.Serialization;
+
 namespace PayClaim.DTOs.Common;
+
+public class ListKpiSummaryDto
+{
+    public decimal TotalAmount { get; set; }
+    public int WaitingCount { get; set; }
+    public decimal WaitingAmount { get; set; }
+    public int ApprovedCount { get; set; }
+    public decimal ApprovedAmount { get; set; }
+}
 
 public class PagedResponse<T> : ApiResponse<IReadOnlyList<T>>
 {
@@ -8,6 +19,9 @@ public class PagedResponse<T> : ApiResponse<IReadOnlyList<T>>
     public int TotalPages => PageSize > 0 ? (int)Math.Ceiling((double)TotalCount / PageSize) : 0;
     public bool HasPreviousPage => PageNumber > 1;
     public bool HasNextPage => PageNumber < TotalPages;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ListKpiSummaryDto? Summary { get; set; }
 
     public PagedResponse()
     {

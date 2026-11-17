@@ -113,7 +113,48 @@ public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUse
 
         var orderedQuery = dbQuery.OrderByDescending(c => c.SubmittedAt);
 
-        var totalCount = await orderedQuery.CountAsync(ct);
+        var summaryRows = await dbQuery
+            .GroupBy(c => new
+            {
+                c.Status,
+                IsOwn = employeeId.HasValue && c.EmployeeId == employeeId.Value
+            })
+            .Select(g => new
+            {
+                g.Key.Status,
+                g.Key.IsOwn,
+                Count = g.Count(),
+                Amount = g.Sum(c => c.Amount)
+            })
+            .ToListAsync(ct);
+
+        var totalCount = summaryRows.Sum(r => r.Count);
+        var summary = new ListKpiSummaryDto
+        {
+            TotalAmount = summaryRows.Sum(r => r.Amount),
+            WaitingCount = summaryRows
+                .Where(r => query.IsMyClaims
+                    ? r.Status == ClaimStatus.Submitted || r.Status == ClaimStatus.UnderReview
+                    : !r.IsOwn && (
+                        (isAdmin && (r.Status == ClaimStatus.Submitted || r.Status == ClaimStatus.UnderReview)) ||
+                        (isManager && r.Status == ClaimStatus.Submitted) ||
+                        (isFinance && r.Status == ClaimStatus.UnderReview)))
+                .Sum(r => r.Count),
+            WaitingAmount = summaryRows
+                .Where(r => query.IsMyClaims
+                    ? r.Status == ClaimStatus.Submitted || r.Status == ClaimStatus.UnderReview
+                    : !r.IsOwn && (
+                        (isAdmin && (r.Status == ClaimStatus.Submitted || r.Status == ClaimStatus.UnderReview)) ||
+                        (isManager && r.Status == ClaimStatus.Submitted) ||
+                        (isFinance && r.Status == ClaimStatus.UnderReview)))
+                .Sum(r => r.Amount),
+            ApprovedCount = summaryRows
+                .Where(r => r.Status == ClaimStatus.Approved || r.Status == ClaimStatus.Paid)
+                .Sum(r => r.Count),
+            ApprovedAmount = summaryRows
+                .Where(r => r.Status == ClaimStatus.Approved || r.Status == ClaimStatus.Paid)
+                .Sum(r => r.Amount)
+        };
 
         var items = await orderedQuery
             .Skip((filter.PageNumber - 1) * filter.PageSize)
@@ -146,6 +187,9 @@ public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUse
             items,
             totalCount,
             filter.PageNumber,
-            filter.PageSize);
+            filter.PageSize)
+        {
+            Summary = summary
+        };
     }
 }

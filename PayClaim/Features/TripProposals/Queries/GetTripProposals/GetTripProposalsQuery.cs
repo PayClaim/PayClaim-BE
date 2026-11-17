@@ -139,8 +139,59 @@ public class GetTripProposalsHandler(PayClaimDbContext context, ICurrentUser cur
                 tp.Participants.Any(p => p.Employee.FullName.Contains(s)));
         }
 
-        // 6. Hitung total data sebelum pagination
-        var totalCount = await dbQuery.CountAsync(ct);
+        // 6. Hitung total data & KPI summary sebelum pagination
+        var summaryRows = await dbQuery
+            .Select(tp => new
+            {
+                tp.Status,
+                TotalAmount = tp.TotalAmount +
+                    (tp.Participants.Sum(p => (decimal?)p.Amount) ?? 0m),
+                IsOwn = employeeId.HasValue &&
+                    tp.Participants.Any(p => p.IsPic && p.EmployeeId == employeeId.Value)
+            })
+            .ToListAsync(ct);
+
+        var totalCount = summaryRows.Count;
+        var isMyTrips = filter.EmployeeId.HasValue;
+
+        var summary = new ListKpiSummaryDto
+        {
+            TotalAmount = summaryRows.Sum(r => r.TotalAmount),
+            WaitingCount = summaryRows.Count(r => isMyTrips
+                ? r.Status == TripProposalStatus.Submitted ||
+                  r.Status == TripProposalStatus.UnderReview ||
+                  r.Status == TripProposalStatus.FinanceManagerReview
+                : !r.IsOwn && (
+                    (isAdmin && (
+                        r.Status == TripProposalStatus.Submitted ||
+                        r.Status == TripProposalStatus.UnderReview ||
+                        r.Status == TripProposalStatus.FinanceManagerReview)) ||
+                    (isManager && r.Status == TripProposalStatus.Submitted) ||
+                    ((isFinance || isFinanceManager) && r.Status == TripProposalStatus.UnderReview) ||
+                    (isFinanceManager && r.Status == TripProposalStatus.FinanceManagerReview))),
+            WaitingAmount = summaryRows
+                .Where(r => isMyTrips
+                    ? r.Status == TripProposalStatus.Submitted ||
+                      r.Status == TripProposalStatus.UnderReview ||
+                      r.Status == TripProposalStatus.FinanceManagerReview
+                    : !r.IsOwn && (
+                        (isAdmin && (
+                            r.Status == TripProposalStatus.Submitted ||
+                            r.Status == TripProposalStatus.UnderReview ||
+                            r.Status == TripProposalStatus.FinanceManagerReview)) ||
+                        (isManager && r.Status == TripProposalStatus.Submitted) ||
+                        ((isFinance || isFinanceManager) && r.Status == TripProposalStatus.UnderReview) ||
+                        (isFinanceManager && r.Status == TripProposalStatus.FinanceManagerReview)))
+                .Sum(r => r.TotalAmount),
+            ApprovedCount = summaryRows.Count(r =>
+                r.Status == TripProposalStatus.Approved ||
+                r.Status == TripProposalStatus.Completed),
+            ApprovedAmount = summaryRows
+                .Where(r =>
+                    r.Status == TripProposalStatus.Approved ||
+                    r.Status == TripProposalStatus.Completed)
+                .Sum(r => r.TotalAmount)
+        };
 
         // 7. Pagination dan mapping DTO
         var items = await dbQuery
@@ -206,6 +257,9 @@ public class GetTripProposalsHandler(PayClaimDbContext context, ICurrentUser cur
             items,
             totalCount,
             filter.PageNumber,
-            filter.PageSize);
+            filter.PageSize)
+        {
+            Summary = summary
+        };
     }
 }

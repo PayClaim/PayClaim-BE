@@ -21,6 +21,11 @@ try
     // Serilog logging
     builder.AddPayClaimSerilog();
 
+    builder.Services.AddResponseCompression(options =>
+    {
+        options.EnableForHttps = true;
+    });
+
     // Add services to the container.
     builder.Services.AddControllers()
         .AddJsonOptions(options =>

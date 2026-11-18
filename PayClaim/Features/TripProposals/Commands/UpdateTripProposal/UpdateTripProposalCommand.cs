@@ -100,25 +100,23 @@ public class UpdateTripProposalHandler(
                 throw new BusinessRuleException("Duplicate participant detected in proposal.");
             }
 
-            var previousAmounts = proposal.Participants
-                .GroupBy(p => p.EmployeeId)
-                .ToDictionary(g => g.Key, g => g.First().Amount);
-
             context.ProposalParticipants.RemoveRange(proposal.Participants);
 
+            // Limit peserta wajib 0 saat pengajuan/revisi; penetapan limit hanya oleh Finance.
             proposal.Participants = req.Participants.Select(p => new ProposalParticipant
             {
                 TripProposalId = proposal.Id,
                 EmployeeId = p.EmployeeId,
                 IsPic = p.IsPic,
-                Amount = p.Amount > 0
-                    ? p.Amount
-                    : (previousAmounts.TryGetValue(p.EmployeeId, out var prev) ? prev : 0)
+                Amount = 0
             }).ToList();
         }
         else
         {
-            // Peserta tidak dikirim: limit peserta yang sudah ada dipertahankan.
+            foreach (var existing in proposal.Participants)
+            {
+                existing.Amount = 0;
+            }
         }
 
         // Approver berikutnya mengikuti hirarki role (satu tingkat di atas PIC).
@@ -151,8 +149,7 @@ public class UpdateTripProposalHandler(
 
         // Notifikasi email ke approver berikutnya setelah revisi diajukan ulang.
         var picName = currentPic.Employee?.FullName ?? "PIC";
-        var proposalTotal = proposal.TotalAmount +
-            proposal.Participants.Sum(p => p.Amount);
+        var proposalTotal = proposal.TotalAmount;
 
         await Task.WhenAll(approvers.Select(approver =>
             emailService.SendTripProposalActionRequiredEmailAsync(
@@ -193,6 +190,7 @@ public class UpdateTripProposalHandler(
             Destination = proposal.Destination,
             StartDate = proposal.StartDate,
             EndDate = proposal.EndDate,
+            AccommodationAmount = proposal.TotalAmount,
             TotalAmount = proposal.TotalAmount,
             SubmittedAt = proposal.SubmittedAt,
             Description = proposal.Description,

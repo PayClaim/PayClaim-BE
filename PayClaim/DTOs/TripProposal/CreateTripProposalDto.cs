@@ -25,6 +25,5 @@ public class CreateTripProposalDto
 
     public List<ParticipantItemDto> Participants { get; set; } = new();
 
-    [Required(ErrorMessage = "Proposal letter is required.")]
     public IFormFile? File { get; set; }
 }

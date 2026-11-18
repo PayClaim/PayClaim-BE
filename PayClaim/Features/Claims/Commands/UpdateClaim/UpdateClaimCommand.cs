@@ -99,13 +99,14 @@ public class UpdateClaimHandler(
                         $"Transaction date must be within the active benefit quota period ({empBenefit.StartDate:yyyy-MM-dd} to {empBenefit.EndDate:yyyy-MM-dd}).");
                 }
 
-                // Hitung klaim benefit lain yang sedang berjalan (kecuali klaim ini sendiri)
+                // Hitung klaim benefit lain yang belum memotong saldo (kecuali klaim ini sendiri)
                 var pendingBenefitClaims = await context.Claims
                     .Where(c => c.EmployeeBenefitId == empBenefit.Id &&
                                 c.EmployeeId == claim.EmployeeId &&
                                 c.Id != claim.Id &&
-                                c.Status != ClaimStatus.Rejected &&
-                                c.Status != ClaimStatus.Paid)
+                                (c.Status == ClaimStatus.Submitted ||
+                                 c.Status == ClaimStatus.UnderReview ||
+                                 c.Status == ClaimStatus.NeedsRevision))
                     .SumAsync(c => c.Amount, ct);
 
                 var availableBalance = Math.Max(0, empBenefit.Balance - pendingBenefitClaims);

@@ -44,22 +44,13 @@ public class DeleteEmployeeHandler(PayClaimDbContext db) : IRequestHandler<Delet
             eb.EndDate = today.AddDays(-1);
         }
 
-        // 4. Hapus Account dan AccountRoles (Akses login dihapus permanen, tetapi data Employee tetap ada di riwayat)
+        // 4. Nonaktifkan Account (pertahankan record agar login dapat mendeteksi status nonaktif dan akun dapat diaktifkan ulang)
         var account = await db.Accounts
             .FirstOrDefaultAsync(a => a.EmployeeId == command.Id, ct);
 
         if (account != null)
         {
-            var accountRoles = await db.AccountRoles
-                .Where(ar => ar.AccountId == account.Id)
-                .ToListAsync(ct);
-
-            if (accountRoles.Count > 0)
-            {
-                db.AccountRoles.RemoveRange(accountRoles);
-            }
-
-            db.Accounts.Remove(account);
+            account.IsActive = false;
         }
 
         await db.SaveChangesAsync(ct);

@@ -17,7 +17,7 @@ public class GetMeHandler(PayClaimDbContext context, ICurrentUser currentUser) :
 
         var userProfile = await context.Accounts
             .AsNoTracking()
-            .Where(a => a.Id == targetAccountId && a.IsActive)
+            .Where(a => a.Id == targetAccountId && a.IsActive && (a.Employee == null || a.Employee.IsActive))
             .Select(a => new UserProfileResponseDto
             {
                 AccountId = a.Id,

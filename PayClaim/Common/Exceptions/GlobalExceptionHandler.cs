@@ -68,6 +68,13 @@ public class GlobalExceptionHandler : IExceptionHandler
                 _logger.LogWarning("Bad HTTP Request: {Message}", badHttpEx.Message);
                 break;
 
+            case DbUpdateConcurrencyException concurrencyEx:
+                statusCode = StatusCodes.Status409Conflict;
+                message = "The resource was modified concurrently by another request.";
+                errors.Add(concurrencyEx.InnerException?.Message ?? concurrencyEx.Message);
+                _logger.LogWarning(concurrencyEx, "Concurrency conflict occurred: {Message}", concurrencyEx.Message);
+                break;
+
             case DbUpdateException dbEx:
                 statusCode = StatusCodes.Status400BadRequest;
                 message = "Database operation failed. Foreign key or data integrity constraint violated.";

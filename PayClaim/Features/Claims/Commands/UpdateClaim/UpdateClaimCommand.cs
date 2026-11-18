@@ -52,8 +52,11 @@ public class UpdateClaimHandler(
             throw new BusinessRuleException("You are not authorized to modify a claim submitted by another employee.");
         }
 
+        var expectedCurrentStatus = claim.Status;
         var request = command.Request;
         string? benefitName = null;
+        Guid? updatedEmployeeBenefitId = null;
+        Guid? updatedTripProposalId = null;
 
         // 4. Validasi aturan bisnis berdasarkan ClaimType
         switch (request.ClaimType)
@@ -117,8 +120,8 @@ public class UpdateClaimHandler(
                 }
 
                 benefitName = empBenefit.Benefit?.Name;
-                claim.EmployeeBenefitId = empBenefit.Id;
-                claim.TripProposalId = null;
+                updatedEmployeeBenefitId = empBenefit.Id;
+                updatedTripProposalId = null;
                 break;
 
             case ClaimType.BusinessTripReimbursement:
@@ -171,13 +174,13 @@ public class UpdateClaimHandler(
                         $"Claim amount (Rp {request.Amount:N0}) exceeds remaining trip budget for this participant (Rp {remainingBudget:N0} out of allocated Rp {participant.Amount:N0}).");
                 }
 
-                claim.TripProposalId = trip.Id;
-                claim.EmployeeBenefitId = null;
+                updatedTripProposalId = trip.Id;
+                updatedEmployeeBenefitId = null;
                 break;
 
             case ClaimType.OperationalReimbursement:
-                claim.EmployeeBenefitId = null;
-                claim.TripProposalId = null;
+                updatedEmployeeBenefitId = null;
+                updatedTripProposalId = null;
                 break;
 
             default:
@@ -185,18 +188,14 @@ public class UpdateClaimHandler(
         }
 
         // 5. Perbarui berkas kuitansi / nota jika ada file baru yang diunggah
+        string? uploadedFilePath = null;
         if (request.ReceiptFile != null && request.ReceiptFile.Length > 0)
         {
-            claim.FilePath = await fileStorage.SaveFileAsync(request.ReceiptFile, "receipts", ct);
+            uploadedFilePath = await fileStorage.SaveFileAsync(request.ReceiptFile, "receipts", ct);
         }
 
-        // 6. Update properti klaim & mulai ulang alur approval.
+        // 6. Tentukan status tujuan & simpan perubahan klaim secara atomik.
         // Approver berikutnya mengikuti hirarki role (satu tingkat di atas pengaju).
-        claim.ClaimType = request.ClaimType;
-        claim.Description = request.Description;
-        claim.TransactionDate = request.TransactionDate;
-        claim.Amount = request.Amount;
-
         var claimantRoles = await context.GetRoleNamesAsync(
             claim.EmployeeId,
             ct);
@@ -213,16 +212,61 @@ public class UpdateClaimHandler(
 
         if (approvers.Count == 0)
         {
+            if (!string.IsNullOrEmpty(uploadedFilePath))
+            {
+                fileStorage.DeleteFile(uploadedFilePath);
+            }
+
             throw new BusinessRuleException(
                 "Tidak ada approver yang tersedia untuk pengajuan ini. " +
                 "Pastikan atasan langsung atau akun Finance/Finance Manager/Admin aktif.");
         }
 
-        claim.Status = ApprovalRouting.GetInitialClaimStatus(resolvedApproverRole);
-        claim.SubmittedAt = DateTime.UtcNow.AddHours(7);
+        var nextStatus = ApprovalRouting.GetInitialClaimStatus(resolvedApproverRole);
+        var submittedAt = DateTime.UtcNow.AddHours(7);
+        var targetFilePath = uploadedFilePath ?? claim.FilePath;
 
-        uow.Claims.Update(claim);
-        await uow.SaveChangesAsync(ct);
+        try
+        {
+            var updatedRows = await context.Claims
+                .Where(c => c.Id == claim.Id && c.Status == expectedCurrentStatus)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(c => c.ClaimType, request.ClaimType)
+                    .SetProperty(c => c.Description, request.Description)
+                    .SetProperty(c => c.TransactionDate, request.TransactionDate)
+                    .SetProperty(c => c.Amount, request.Amount)
+                    .SetProperty(c => c.EmployeeBenefitId, updatedEmployeeBenefitId)
+                    .SetProperty(c => c.TripProposalId, updatedTripProposalId)
+                    .SetProperty(c => c.FilePath, targetFilePath)
+                    .SetProperty(c => c.Status, nextStatus)
+                    .SetProperty(c => c.SubmittedAt, submittedAt),
+                    ct);
+
+            if (updatedRows == 0)
+            {
+                throw new ConflictException(
+                    "Claim status has already been updated and cannot be modified.");
+            }
+        }
+        catch
+        {
+            if (!string.IsNullOrEmpty(uploadedFilePath))
+            {
+                fileStorage.DeleteFile(uploadedFilePath);
+            }
+
+            throw;
+        }
+
+        claim.ClaimType = request.ClaimType;
+        claim.Description = request.Description;
+        claim.TransactionDate = request.TransactionDate;
+        claim.Amount = request.Amount;
+        claim.EmployeeBenefitId = updatedEmployeeBenefitId;
+        claim.TripProposalId = updatedTripProposalId;
+        claim.FilePath = targetFilePath;
+        claim.Status = nextStatus;
+        claim.SubmittedAt = submittedAt;
 
         // 6b. Notifikasi email ke approver berikutnya setelah revisi.
         if (ApprovalRouting.IsManagerStage(resolvedApproverRole))

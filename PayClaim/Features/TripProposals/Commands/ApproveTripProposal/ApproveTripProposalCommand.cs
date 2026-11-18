@@ -103,6 +103,7 @@ public class ApproveTripProposalHandler(
             "Admin",
             StringComparer.OrdinalIgnoreCase);
 
+        var expectedCurrentStatus = proposal.Status;
         byte currentLevel;
         TripProposalStatus nextStatus;
 
@@ -322,9 +323,7 @@ public class ApproveTripProposalHandler(
                 $"Cannot perform approval on a trip proposal with status '{proposal.Status}'.");
         }
 
-        proposal.Status = nextStatus;
-
-        uow.TripProposals.Update(proposal);
+        decimal targetTotalAmount = updatedAccommodationBudget ?? proposal.TotalAmount;
 
         // Keep the approver's manual note.
         string? approvalNotes = command.Request.Notes;
@@ -362,11 +361,30 @@ public class ApproveTripProposalHandler(
             DecidedAt = DateTime.UtcNow.AddHours(7)
         };
 
+        await using var tx = await context.Database.BeginTransactionAsync(ct);
+
+        var updatedRows = await context.TripProposals
+            .Where(tp => tp.Id == proposal.Id && tp.Status == expectedCurrentStatus)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(tp => tp.Status, nextStatus)
+                .SetProperty(tp => tp.TotalAmount, targetTotalAmount),
+                ct);
+
+        if (updatedRows == 0)
+        {
+            throw new ConflictException(
+                "Trip proposal status has already been updated by another approver.");
+        }
+
+        proposal.Status = nextStatus;
+        context.Entry(proposal).State = EntityState.Unchanged;
+
         await uow.TripApprovals.AddAsync(
             approvalRecord,
             ct);
 
         await uow.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
         // Send a status notification email to the proposal PIC.
         // Send only the manual note, not the internal budget marker.

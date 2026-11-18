@@ -151,14 +151,12 @@ public class RejectClaimHandler(
             }
         }
 
-        // 8. Ubah status Claim berdasarkan keputusan.
-        claim.Status = decision == ApprovalDecision.NeedsRevision
+        // 8. Siapkan status tujuan dan riwayat approval, lalu update atomik bersyarat.
+        var expectedCurrentStatus = claim.Status;
+        var nextStatus = decision == ApprovalDecision.NeedsRevision
             ? ClaimStatus.NeedsRevision
             : ClaimStatus.Rejected;
 
-        uow.Claims.Update(claim);
-
-        // 9. Buat riwayat approval.
         var approvalRecord = new ClaimApproval
         {
             ClaimId = claim.Id,
@@ -170,12 +168,33 @@ public class RejectClaimHandler(
             DecidedAt = DateTime.UtcNow.AddHours(7)
         };
 
+        await using var tx = await context.Database.BeginTransactionAsync(ct);
+
+        var updatedClaimRows = await context.Claims
+            .Where(c => c.Id == claim.Id && c.Status == expectedCurrentStatus)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(c => c.Status, nextStatus),
+                ct);
+
+        if (updatedClaimRows == 0)
+        {
+            throw new ConflictException(
+                "Claim status has already been updated by another approver.");
+        }
+
+        claim.Status = nextStatus;
+        if (context.Entry(claim).State != EntityState.Detached)
+        {
+            context.Entry(claim).Property(c => c.Status).IsModified = false;
+        }
+
         await uow.ClaimApprovals.AddAsync(
             approvalRecord,
             ct);
 
-        // 10. Simpan perubahan ke database.
+        // 9. Simpan riwayat approval dan commit transaksi.
         await uow.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
         // 11. Kirim notifikasi email penolakan / revisi ke karyawan.
         var claimantEmp = await uow.Employees.GetByIdAsync(

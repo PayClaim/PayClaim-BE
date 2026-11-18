@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
 using PayClaim.Common.Security;
@@ -99,16 +100,21 @@ public class CreateClaimHandler(
             "receipts",
             ct);
 
-        Claim claim;
+        Claim claim = null!;
+        const int maxDeadlockRetries = 3;
         try
         {
-            // 3. Simpan dalam transaksi Serializable untuk mencegah race condition kuota/anggaran
-            await using var tx = await context.Database.BeginTransactionAsync(
-                System.Data.IsolationLevel.Serializable,
-                ct);
+            for (int attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    // 3. Simpan dalam transaksi Serializable untuk mencegah race condition kuota/anggaran
+                    await using var tx = await context.Database.BeginTransactionAsync(
+                        System.Data.IsolationLevel.Serializable,
+                        ct);
 
-            // Validasi berdasarkan jenis Claim
-            switch (request.ClaimType)
+                    // Validasi berdasarkan jenis Claim
+                    switch (request.ClaimType)
         {
             case ClaimType.Benefit:
 
@@ -275,10 +281,18 @@ public class CreateClaimHandler(
                 TripProposalId = request.TripProposalId
             };
 
-            await uow.Claims.AddAsync(claim, ct);
+                    await uow.Claims.AddAsync(claim, ct);
 
-            await uow.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
+                    await uow.SaveChangesAsync(ct);
+                    await tx.CommitAsync(ct);
+                    break;
+                }
+                catch (Exception ex) when (attempt < maxDeadlockRetries && IsDeadlockException(ex))
+                {
+                    context.ChangeTracker.Clear();
+                    await Task.Delay(50 * attempt + Random.Shared.Next(10, 40), ct);
+                }
+            }
         }
         catch
         {
@@ -349,5 +363,18 @@ public class CreateClaimHandler(
 
             ApprovalHistory = new List<ClaimApprovalHistoryDto>()
         };
+    }
+
+    private static bool IsDeadlockException(Exception exception)
+    {
+        for (var current = exception; current != null; current = current.InnerException)
+        {
+            if (current is SqlException { Number: 1205 })
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

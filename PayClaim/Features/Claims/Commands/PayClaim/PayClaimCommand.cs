@@ -50,9 +50,6 @@ public class PayClaimHandler(
             throw new NotFoundException("No eligible finance employee found to record disbursement.");
         }
 
-        claim.Status = ClaimStatus.Paid;
-        uow.Claims.Update(claim);
-
         var approvalRecord = new ClaimApproval
         {
             ClaimId = claim.Id,
@@ -64,8 +61,29 @@ public class PayClaimHandler(
             DecidedAt = DateTime.UtcNow.AddHours(7)
         };
 
+        await using var tx = await context.Database.BeginTransactionAsync(ct);
+
+        var updatedClaimRows = await context.Claims
+            .Where(c => c.Id == claim.Id && c.Status == ClaimStatus.Approved)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(c => c.Status, ClaimStatus.Paid),
+                ct);
+
+        if (updatedClaimRows == 0)
+        {
+            throw new ConflictException(
+                "Claim has already been disbursed or its status was modified concurrently.");
+        }
+
+        claim.Status = ClaimStatus.Paid;
+        if (context.Entry(claim).State != EntityState.Detached)
+        {
+            context.Entry(claim).Property(c => c.Status).IsModified = false;
+        }
+
         await uow.ClaimApprovals.AddAsync(approvalRecord, ct);
         await uow.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
         // 7. Kirim notifikasi email pencairan dana ke karyawan (payroll selanjutnya)
         var claimant = await uow.Employees.GetByIdAsync(new object[] { claim.EmployeeId }, ct);

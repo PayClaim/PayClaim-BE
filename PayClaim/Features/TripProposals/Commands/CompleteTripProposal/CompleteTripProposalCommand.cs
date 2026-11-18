@@ -5,7 +5,6 @@ using PayClaim.Common.Exceptions;
 using PayClaim.Common.Security;
 using PayClaim.Common.Services;
 using PayClaim.Data;
-using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.TripProposal;
 using PayClaim.Enums;
 
@@ -18,7 +17,6 @@ public record CompleteTripProposalCommand(
     string? ReportNotes = null) : IRequest<TripProposalDetailDto>;
 
 public class CompleteTripProposalHandler(
-    IUnitOfWork uow,
     PayClaimDbContext context,
     IFileStorageService fileStorage,
     IEmailService emailService,
@@ -63,31 +61,58 @@ public class CompleteTripProposalHandler(
                 "Only the PIC can submit the travel report.");
         }
 
+        string? uploadedFilePath = null;
         if (command.ReportFile != null &&
             command.ReportFile.Length > 0)
         {
-            proposal.FilePath = await fileStorage.SaveFileAsync(
+            uploadedFilePath = await fileStorage.SaveFileAsync(
                 command.ReportFile,
                 "reports",
                 ct);
         }
 
+        var updatedFilePath = uploadedFilePath ?? proposal.FilePath;
+        var updatedDescription = proposal.Description;
         if (!string.IsNullOrWhiteSpace(command.ReportNotes))
         {
             // shortcut: simpan report notes ke description agar tidak perlu migrasi skema tabel, upgrade jika kolom ReportNotes resmi ditambahkan ke Trip_proposals
-            proposal.Description = string.IsNullOrWhiteSpace(proposal.Description)
+            updatedDescription = string.IsNullOrWhiteSpace(proposal.Description)
                 ? $"[Travel Report]: {command.ReportNotes.Trim()}"
                 : $"{proposal.Description}\n\n[Travel Report]: {command.ReportNotes.Trim()}";
         }
 
+        try
+        {
+            var updatedRows = await context.TripProposals
+                .Where(tp => tp.Id == proposal.Id && tp.Status == TripProposalStatus.Approved)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(tp => tp.Status, TripProposalStatus.Completed)
+                    .SetProperty(tp => tp.FilePath, updatedFilePath)
+                    .SetProperty(tp => tp.Description, updatedDescription),
+                    ct);
+
+            if (updatedRows == 0)
+            {
+                throw new ConflictException(
+                    "Trip proposal status has already been updated and cannot be completed.");
+            }
+        }
+        catch
+        {
+            if (!string.IsNullOrEmpty(uploadedFilePath))
+            {
+                fileStorage.DeleteFile(uploadedFilePath);
+            }
+
+            throw;
+        }
+
+        proposal.FilePath = updatedFilePath;
+        proposal.Description = updatedDescription;
         proposal.Status = TripProposalStatus.Completed;
 
         var directManager = await context.GetDirectManagerAsync(
             pic.EmployeeId, ct);
-
-        uow.TripProposals.Update(proposal);
-
-        await uow.SaveChangesAsync(ct);
 
         // Notifikasi ke PIC dan seluruh peserta bahwa perjalanan dinas selesai.
         var recipients = proposal.Participants

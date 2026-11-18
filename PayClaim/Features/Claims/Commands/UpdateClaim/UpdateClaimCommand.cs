@@ -223,7 +223,7 @@ public class UpdateClaimHandler(
         }
 
         var nextStatus = ApprovalRouting.GetInitialClaimStatus(resolvedApproverRole);
-        var submittedAt = DateTime.UtcNow.AddHours(7);
+        var submittedAt = AppTime.WibNow;
         var targetFilePath = uploadedFilePath ?? claim.FilePath;
 
         try

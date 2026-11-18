@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.DTOs.EmployeeBenefit;
 using PayClaim.DTOs.Master;
@@ -24,7 +25,7 @@ public class GetEmployeeBenefitsHandler(PayClaimDbContext db) : IRequestHandler<
         {
             employeeBenefits = employeeBenefits.Where(eb => eb.BenefitId == query.Filter.BenefitId.Value);
         }
-        var today = DateOnly.FromDateTime(DateTime.Today);
+        var today = AppTime.WibToday;
 
         return await employeeBenefits
             .OrderBy(eb => eb.Employee.FullName)

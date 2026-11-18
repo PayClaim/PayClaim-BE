@@ -1,3 +1,4 @@
+using PayClaim.Common.Services;
 using PayClaim.Entities;
 using PayClaim.Enums;
 
@@ -9,7 +10,7 @@ public static class BenefitPeriodHelper
         BenefitPeriodType periodType,
         DateOnly? referenceDate = null)
     {
-        var today = referenceDate ?? DateOnly.FromDateTime(DateTime.Today);
+        var today = referenceDate ?? AppTime.WibToday;
 
         return periodType switch
         {
@@ -35,7 +36,7 @@ public static class BenefitPeriodHelper
             return false;
         }
 
-        var today = referenceDate ?? DateOnly.FromDateTime(DateTime.Today);
+        var today = referenceDate ?? AppTime.WibToday;
 
         // Jika periode belum berakhir, tidak perlu renewal
         if (empBenefit.EndDate >= today)

@@ -168,7 +168,7 @@ public class CreateTripProposalHandler(
             TotalAmount = request.TotalAmount,
 
             Description = request.Description,
-            SubmittedAt = DateTime.UtcNow.AddHours(7),
+            SubmittedAt = AppTime.WibNow,
             Status = ApprovalRouting.GetInitialTripStatus(resolvedApproverRole),
             FilePath = filePath
         };

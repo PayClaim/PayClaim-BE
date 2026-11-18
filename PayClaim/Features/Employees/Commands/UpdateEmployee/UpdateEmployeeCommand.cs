@@ -1,5 +1,6 @@
 using MediatR;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Services;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
 using PayClaim.Entities;
@@ -114,7 +115,7 @@ public class UpdateEmployeeHandler(IUnitOfWork uow) : IRequestHandler<UpdateEmpl
                     {
                         AccountId = account.Id,
                         RoleId = role.Id,
-                        AssignedAt = DateTime.UtcNow.AddHours(7)
+                        AssignedAt = AppTime.WibNow
                     }, ct);
                 }
             }

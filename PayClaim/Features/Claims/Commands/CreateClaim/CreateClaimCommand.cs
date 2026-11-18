@@ -270,7 +270,7 @@ public class CreateClaimHandler(
                 Description = request.Description,
                 TransactionDate = request.TransactionDate,
                 Amount = request.Amount,
-                SubmittedAt = DateTime.UtcNow.AddHours(7),
+                SubmittedAt = AppTime.WibNow,
                 Status = ApprovalRouting.GetInitialClaimStatus(resolvedApproverRole),
                 FilePath = filePath,
 

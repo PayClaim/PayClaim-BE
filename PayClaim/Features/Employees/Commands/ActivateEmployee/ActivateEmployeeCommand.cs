@@ -111,14 +111,14 @@ public class ActivateEmployeeHandler(
                     {
                         AccountId = account.Id,
                         RoleId = role.Id,
-                        AssignedAt = DateTime.UtcNow.AddHours(7)
+                        AssignedAt = AppTime.WibNow
                     }, ct);
                 }
             }
         }
 
         // 4. Pulihkan jatah EmployeeBenefit sesuai BenefitPlans dan PeriodType masing-masing
-        var today = DateOnly.FromDateTime(DateTime.Today);
+        var today = AppTime.WibToday;
 
         var matchingPlans = await db.BenefitPlans
             .Include(bp => bp.Benefit)

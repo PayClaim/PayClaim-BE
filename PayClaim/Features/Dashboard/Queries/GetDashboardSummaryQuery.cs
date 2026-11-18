@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
 using PayClaim.Common.Security;
+using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.DTOs.Dashboard;
 using PayClaim.Entities;
@@ -39,7 +40,7 @@ public class GetDashboardSummaryHandler(
         }
 
         var currentEmpId = employeeId ?? Guid.Empty;
-        var jakartaNow = DateTime.UtcNow.AddHours(7);
+        var jakartaNow = AppTime.WibNow;
         var todayStart = jakartaNow.Date;
         var todayEnd = todayStart.AddDays(1);
         var todayDateOnly = DateOnly.FromDateTime(todayStart);

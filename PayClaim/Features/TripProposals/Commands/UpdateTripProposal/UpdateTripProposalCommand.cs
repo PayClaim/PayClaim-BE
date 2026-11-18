@@ -142,7 +142,7 @@ public class UpdateTripProposalHandler(
 
         proposal.Status =
             ApprovalRouting.GetInitialTripStatus(resolvedApproverRole);
-        proposal.SubmittedAt = DateTime.UtcNow.AddHours(7);
+        proposal.SubmittedAt = AppTime.WibNow;
 
         uow.TripProposals.Update(proposal);
         await uow.SaveChangesAsync(ct);

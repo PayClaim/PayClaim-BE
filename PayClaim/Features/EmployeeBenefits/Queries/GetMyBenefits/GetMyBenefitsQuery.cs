@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Security;
+using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.DTOs.EmployeeBenefit;
 using PayClaim.Entities;
@@ -16,7 +17,7 @@ public class GetMyBenefitsHandler(PayClaimDbContext db, ICurrentUser currentUser
         CancellationToken ct)
     {
         var targetEmployeeId = query.EmployeeId ?? currentUser.RequiredEmployeeId;
-        var today = DateOnly.FromDateTime(DateTime.Today);
+        var today = AppTime.WibToday;
 
         var employee = await db.Employees
             .AsNoTracking()

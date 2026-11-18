@@ -63,7 +63,7 @@ public class PayClaimHandler(
             Decision = ApprovalDecision.Approved,
             Notes = command.Notes ?? "Dana reimburse berhasil dicairkan dan dimasukkan ke dalam payroll selanjutnya.",
             ApprovalLevel = 3, 
-            DecidedAt = DateTime.UtcNow.AddHours(7)
+            DecidedAt = AppTime.WibNow
         };
 
         await using var tx = await context.Database.BeginTransactionAsync(ct);

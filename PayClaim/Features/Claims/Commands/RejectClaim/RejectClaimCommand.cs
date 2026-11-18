@@ -165,7 +165,7 @@ public class RejectClaimHandler(
             Decision = decision,
             Notes = command.Request.Notes,
             ApprovalLevel = currentLevel,
-            DecidedAt = DateTime.UtcNow.AddHours(7)
+            DecidedAt = AppTime.WibNow
         };
 
         await using var tx = await context.Database.BeginTransactionAsync(ct);

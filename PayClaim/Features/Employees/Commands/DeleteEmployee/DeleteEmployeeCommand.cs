@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Services;
 using PayClaim.Data;
 
 namespace PayClaim.Features.Employees.Commands.DeleteEmployee;
@@ -34,7 +35,7 @@ public class DeleteEmployeeHandler(PayClaimDbContext db) : IRequestHandler<Delet
 
         // 3. Nonaktifkan (expire) benefit yang masih aktif
         // Record EmployeeBenefit tetap dipertahankan agar integritas histori Claims tidak rusak.
-        var today = DateOnly.FromDateTime(DateTime.Today);
+        var today = AppTime.WibToday;
         var activeBenefits = await db.EmployeeBenefits
             .Where(eb => eb.EmployeeId == command.Id && eb.EndDate >= today)
             .ToListAsync(ct);

@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
@@ -29,7 +30,7 @@ public class CreateBenefitPlanHandler(IUnitOfWork uow, PayClaimDbContext db) : I
         if (benefit == null)
             throw new NotFoundException("Benefit not found.");
 
-        var today = DateOnly.FromDateTime(DateTime.Today);
+        var today = AppTime.WibToday;
         DateOnly startDate;
         DateOnly endDate;
 

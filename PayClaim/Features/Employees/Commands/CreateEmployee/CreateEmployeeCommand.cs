@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PayClaim.Common.Exceptions;
+using PayClaim.Common.Services;
 using PayClaim.Data;
 using PayClaim.Data.UnitOfWork;
 using PayClaim.DTOs.Master;
@@ -24,7 +25,7 @@ public class CreateEmployeeHandler(
     {
         var request = command.Request;
 
-        var year = DateTime.UtcNow.AddHours(7).Year;
+        var year = AppTime.WibNow.Year;
         string employeeNumber;
 
         do
@@ -159,7 +160,7 @@ public class CreateEmployeeHandler(
             {
                 AccountId = account.Id,
                 RoleId = roleId,
-                AssignedAt = DateTime.UtcNow.AddHours(7)
+                AssignedAt = AppTime.WibNow
             });
         }
 

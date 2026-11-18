@@ -5,10 +5,11 @@ namespace PayClaim.DTOs.Auth;
 public class ResetPasswordRequestDto
 {
     /// <summary>
-    /// Username atau Email akun yang akan di-reset.
+    /// Email akun yang akan di-reset.
     /// </summary>
-    [Required(ErrorMessage = "Username or email is required.")]
-    public string Username { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Email is required.")]
+    [EmailAddress(ErrorMessage = "Invalid email address format.")]
+    public string Email { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "New password is required.")]
     [MinLength(6, ErrorMessage = "New password must be at least 6 characters long.")]

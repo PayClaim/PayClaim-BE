@@ -74,7 +74,7 @@ public class EmailService : IEmailService
         string positionTitle,
         CancellationToken ct = default)
     {
-        var subject = $"[PayClaim] Selamat Bergabung di Perusahaan - Informasi Akun Karyawan";
+        var subject = $"[Cakra] Selamat Bergabung di Perusahaan - Informasi Akun Karyawan";
         var changePasswordUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/change-password";
         fullName = Enc(fullName);
         employeeNumber = Enc(employeeNumber);
@@ -99,7 +99,7 @@ public class EmailService : IEmailService
                     <tr>
                         <td style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 32px 40px; text-align: left;'>
                             <div style='font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;'>
-                                PayClaim System
+                                Cakra System
                             </div>
                             <div style='font-size: 13px; color: #94a3b8; margin-top: 4px;'>
                                 HR &amp; Finance Management Portal
@@ -114,7 +114,7 @@ public class EmailService : IEmailService
                                 Selamat Datang, {fullName}!
                             </h2>
                             <p style='margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: #475569;'>
-                                Akun Anda pada portal <strong>PayClaim</strong> telah berhasil didaftarkan oleh HR Administrator. Anda sekarang dapat mengakses layanan penugasan tunjangan benefit kesehatan dan klaim reimbursement perusahaan.
+                                Akun Anda pada portal <strong>Cakra</strong> telah berhasil didaftarkan oleh HR Administrator. Anda sekarang dapat mengakses layanan penugasan tunjangan benefit kesehatan dan klaim reimbursement perusahaan.
                             </p>
 
                             <!-- Credentials Box -->
@@ -166,7 +166,7 @@ public class EmailService : IEmailService
                     <tr>
                         <td style='background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 40px; text-align: center;'>
                             <p style='margin: 0; font-size: 12px; color: #94a3b8;'>
-                                &copy; 2026 PayClaim - HR &amp; Finance Management Portal. Seluruh hak cipta dilindungi undang-undang.
+                                &copy; 2026 Cakra - HR &amp; Finance Management Portal. Seluruh hak cipta dilindungi undang-undang.
                             </p>
                             <p style='margin: 4px 0 0 0; font-size: 11px; color: #cbd5e1;'>
                                 Email ini dikirim secara otomatis oleh sistem. Mohon tidak membalas email ini.
@@ -201,12 +201,12 @@ public class EmailService : IEmailService
 
         var subject = newStatus switch
         {
-            "Paid" => "[PayClaim] Pencairan Reimbursement: Klaim Masuk Payroll Selanjutnya",
-            "UnderReview" => "[PayClaim] Pengajuan Klaim Disetujui Manajer (Under Review)",
-            "Approved" => "[PayClaim] Pengajuan Klaim Disetujui oleh Finance",
-            "Rejected" => "[PayClaim] Pengajuan Klaim Ditolak",
-            "NeedsRevision" => "[PayClaim] Pengajuan Klaim Memerlukan Perbaikan / Revisi",
-            _ => $"[PayClaim] Pembaruan Status Pengajuan Klaim: {newStatus}"
+            "Paid" => "[Cakra] Pencairan Reimbursement: Klaim Masuk Payroll Selanjutnya",
+            "UnderReview" => "[Cakra] Pengajuan Klaim Disetujui Manajer (Under Review)",
+            "Approved" => "[Cakra] Pengajuan Klaim Disetujui oleh Finance",
+            "Rejected" => "[Cakra] Pengajuan Klaim Ditolak",
+            "NeedsRevision" => "[Cakra] Pengajuan Klaim Memerlukan Perbaikan / Revisi",
+            _ => $"[Cakra] Pembaruan Status Pengajuan Klaim: {newStatus}"
         };
 
         var badgeColor = newStatus switch
@@ -255,7 +255,7 @@ public class EmailService : IEmailService
                 <table width='600' border='0' cellspacing='0' cellpadding='0' style='max-width:600px; width:100%; background:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);'>
                     <tr>
                         <td style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:28px 36px; color:#ffffff;'>
-                            <div style='font-size:20px; font-weight:700;'>PayClaim - Notifikasi Status Klaim</div>
+                            <div style='font-size:20px; font-weight:700;'>Cakra - Notifikasi Status Klaim</div>
                             <div style='font-size:13px; color:#94a3b8; margin-top:4px;'>HR &amp; Finance Management Portal</div>
                         </td>
                     </tr>
@@ -306,14 +306,14 @@ public class EmailService : IEmailService
                             </div>
 
                             <p style='font-size:13px; color:#64748b; text-align:center; margin:0;'>
-                                Anda dapat memantau riwayat lengkap klaim Anda di portal PayClaim.
+                                Anda dapat memantau riwayat lengkap klaim Anda di portal Cakra.
                             </p>
                         </td>
                     </tr>
                     <tr>
                         <td style='background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 36px; text-align: center;'>
                             <p style='margin: 0; font-size: 12px; color: #94a3b8;'>
-                                &copy; 2026 PayClaim - HR &amp; Finance Management Portal.
+                                &copy; 2026 Cakra - HR &amp; Finance Management Portal.
                             </p>
                         </td>
                     </tr>
@@ -340,7 +340,7 @@ public class EmailService : IEmailService
         Guid claimId,
         CancellationToken ct = default)
     {
-        var subject = $"[PayClaim] Pengajuan Klaim dari {employeeName} - Rp {amount:N0}";
+        var subject = $"[Cakra] Pengajuan Klaim dari {employeeName} - Rp {amount:N0}";
         var claimUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/claims/{claimId}";
         managerName = Enc(managerName);
         employeeName = Enc(employeeName);
@@ -363,15 +363,15 @@ public class EmailService : IEmailService
                 <table width='600' border='0' cellspacing='0' cellpadding='0' style='max-width:600px; width:100%; background:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);'>
                     <tr>
                         <td style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:28px 36px; color:#ffffff;'>
-                            <div style='font-size:20px; font-weight:700;'>PayClaim - Notifikasi Approval Manajer</div>
-                            <div style='font-size:13px; color:#94a3b8; margin-top:4px;'>Persetujuan Reimbursement Bawahan</div>
+                            <div style='font-size:20px; font-weight:700;'>Cakra - Notifikasi Approval Manajer</div>
+                            <div style='font-size:13px; color:#94a3b8; margin-top:4px;'>Persetujuan Reimbursement Karyawan Team</div>
                         </td>
                     </tr>
                     <tr>
                         <td style='padding:36px;'>
                             <h3 style='margin:0 0 12px 0; color:#0f172a;'>Halo, {managerName}</h3>
                             <p style='margin:0 0 20px 0; font-size:15px; line-height:1.6; color:#475569;'>
-                                Karyawan bawahan Anda, <strong>{employeeName}</strong>, telah mengajukan (atau mengajukan ulang) klaim reimbursement yang memerlukan persetujuan dan verifikasi dari Anda sebagai atasan langsung.
+                                Karyawan Team Anda, <strong>{employeeName}</strong>, telah mengajukan (atau mengajukan ulang) klaim reimbursement yang memerlukan persetujuan dan verifikasi dari Anda sebagai atasan langsung.
                             </p>
                             
                             <div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin:24px 0;'>
@@ -420,7 +420,7 @@ public class EmailService : IEmailService
                     <tr>
                         <td style='background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 36px; text-align: center;'>
                             <p style='margin: 0; font-size: 12px; color: #94a3b8;'>
-                                &copy; 2026 PayClaim - HR &amp; Finance Management Portal.
+                                &copy; 2026 Cakra - HR &amp; Finance Management Portal.
                             </p>
                         </td>
                     </tr>
@@ -447,7 +447,7 @@ public class EmailService : IEmailService
         Guid claimId,
         CancellationToken ct = default)
     {
-        var subject = $"[PayClaim] Klaim Baru Masuk Antrean Finance: {employeeName} (Disetujui Manajer)";
+        var subject = $"[Cakra] Klaim Baru Masuk Antrean Finance: {employeeName} (Disetujui Manajer)";
         var claimUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/claims/{claimId}";
         financeName = Enc(financeName);
         employeeName = Enc(employeeName);
@@ -471,7 +471,7 @@ public class EmailService : IEmailService
                 <table width='600' border='0' cellspacing='0' cellpadding='0' style='max-width:600px; width:100%; background:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);'>
                     <tr>
                         <td style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:28px 36px; color:#ffffff;'>
-                            <div style='font-size:20px; font-weight:700;'>PayClaim - Notifikasi Antrean Finance</div>
+                            <div style='font-size:20px; font-weight:700;'>Cakra - Notifikasi Antrean Finance</div>
                             <div style='font-size:13px; color:#94a3b8; margin-top:4px;'>Klaim Disetujui Manajer &amp; Masuk ke Sistem Finance</div>
                         </td>
                     </tr>
@@ -533,7 +533,7 @@ public class EmailService : IEmailService
                     <tr>
                         <td style='background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 36px; text-align: center;'>
                             <p style='margin: 0; font-size: 12px; color: #94a3b8;'>
-                                &copy; 2026 PayClaim - HR &amp; Finance Management Portal.
+                                &copy; 2026 Cakra - HR &amp; Finance Management Portal.
                             </p>
                         </td>
                     </tr>
@@ -565,7 +565,7 @@ public class EmailService : IEmailService
             ? "Finance"
             : stageLabel;
 
-        var subject = $"[PayClaim] Klaim Membutuhkan Persetujuan {stageLabel}: {employeeName} - Rp {amount:N0}";
+        var subject = $"[Cakra] Klaim Membutuhkan Persetujuan {stageLabel}: {employeeName} - Rp {amount:N0}";
         var claimUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/claims/{claimId}";
         financeName = Enc(financeName);
         employeeName = Enc(employeeName);
@@ -589,7 +589,7 @@ public class EmailService : IEmailService
                 <table width='600' border='0' cellspacing='0' cellpadding='0' style='max-width:600px; width:100%; background:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);'>
                     <tr>
                         <td style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:28px 36px; color:#ffffff;'>
-                            <div style='font-size:20px; font-weight:700;'>PayClaim - Notifikasi Persetujuan Klaim</div>
+                            <div style='font-size:20px; font-weight:700;'>Cakra - Notifikasi Persetujuan Klaim</div>
                             <div style='font-size:13px; color:#94a3b8; margin-top:4px;'>Menunggu Tindakan: {stageLabelHtml}</div>
                         </td>
                     </tr>
@@ -646,7 +646,7 @@ public class EmailService : IEmailService
                     <tr>
                         <td style='background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 36px; text-align: center;'>
                             <p style='margin: 0; font-size: 12px; color: #94a3b8;'>
-                                &copy; 2026 PayClaim - HR &amp; Finance Management Portal.
+                                &copy; 2026 Cakra - HR &amp; Finance Management Portal.
                             </p>
                         </td>
                     </tr>
@@ -673,7 +673,7 @@ public class EmailService : IEmailService
         string? notes = null,
         CancellationToken ct = default)
     {
-        var subject = $"[PayClaim] Proposal SPD Menunggu Persetujuan Anda: {destination}";
+        var subject = $"[Cakra] Proposal SPD Menunggu Persetujuan Anda: {destination}";
         var proposalUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/trip-proposals/{proposalId}";
         approverName = Enc(approverName);
         submitterName = Enc(submitterName);
@@ -695,7 +695,7 @@ public class EmailService : IEmailService
                 <table width='600' border='0' cellspacing='0' cellpadding='0' style='max-width:600px; width:100%; background:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);'>
                     <tr>
                         <td style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:28px 36px; color:#ffffff;'>
-                            <div style='font-size:20px; font-weight:700;'>PayClaim - Perjalanan Dinas (SPD)</div>
+                            <div style='font-size:20px; font-weight:700;'>Cakra - Perjalanan Dinas (SPD)</div>
                             <div style='font-size:13px; color:#94a3b8; margin-top:4px;'>Menunggu Tindakan: {stageLabel}</div>
                         </td>
                     </tr>
@@ -757,7 +757,7 @@ public class EmailService : IEmailService
                     <tr>
                         <td style='background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 36px; text-align: center;'>
                             <p style='margin: 0; font-size: 12px; color: #94a3b8;'>
-                                &copy; 2026 PayClaim - HR &amp; Finance Management Portal.
+                                &copy; 2026 Cakra - HR &amp; Finance Management Portal.
                             </p>
                         </td>
                     </tr>
@@ -783,13 +783,13 @@ public class EmailService : IEmailService
     {
         var subject = newStatus switch
         {
-            "Approved" => $"[PayClaim] Proposal SPD Disetujui: {destination}",
-            "Completed" => $"[PayClaim] Perjalanan Dinas Selesai: {destination}",
-            "Rejected" => $"[PayClaim] Proposal SPD Ditolak: {destination}",
-            "NeedsRevision" => $"[PayClaim] Proposal SPD Memerlukan Revisi: {destination}",
-            "UnderReview" => $"[PayClaim] Proposal SPD Diteruskan ke Finance: {destination}",
-            "FinanceManagerReview" => $"[PayClaim] Proposal SPD Menunggu Finance Manager: {destination}",
-            _ => $"[PayClaim] Pembaruan Status Proposal SPD ({destination}): {newStatus}"
+            "Approved" => $"[Cakra] Proposal SPD Disetujui: {destination}",
+            "Completed" => $"[Cakra] Perjalanan Dinas Selesai: {destination}",
+            "Rejected" => $"[Cakra] Proposal SPD Ditolak: {destination}",
+            "NeedsRevision" => $"[Cakra] Proposal SPD Memerlukan Revisi: {destination}",
+            "UnderReview" => $"[Cakra] Proposal SPD Diteruskan ke Finance: {destination}",
+            "FinanceManagerReview" => $"[Cakra] Proposal SPD Menunggu Finance Manager: {destination}",
+            _ => $"[Cakra] Pembaruan Status Proposal SPD ({destination}): {newStatus}"
         };
 
         picName = Enc(picName);
@@ -845,7 +845,7 @@ public class EmailService : IEmailService
                 <table width='600' border='0' cellspacing='0' cellpadding='0' style='max-width:600px; width:100%; background:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);'>
                     <tr>
                         <td style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:28px 36px; color:#ffffff;'>
-                            <div style='font-size:20px; font-weight:700;'>PayClaim - Notifikasi Proposal SPD</div>
+                            <div style='font-size:20px; font-weight:700;'>Cakra - Notifikasi Proposal SPD</div>
                             <div style='font-size:13px; color:#94a3b8; margin-top:4px;'>Perjalanan Dinas</div>
                         </td>
                     </tr>
@@ -895,7 +895,7 @@ public class EmailService : IEmailService
                     <tr>
                         <td style='background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 36px; text-align: center;'>
                             <p style='margin: 0; font-size: 12px; color: #94a3b8;'>
-                                &copy; 2026 PayClaim - HR &amp; Finance Management Portal.
+                                &copy; 2026 Cakra - HR &amp; Finance Management Portal.
                             </p>
                         </td>
                     </tr>
@@ -916,7 +916,7 @@ public class EmailService : IEmailService
         string newPassword,
         CancellationToken ct = default)
     {
-        var subject = "[PayClaim] Pembaruan Kata Sandi Akun Anda";
+        var subject = "[Cakra] Pembaruan Kata Sandi Akun Anda";
         var loginUrl = $"{_settings.FrontendUrl.TrimEnd('/')}/login";
         fullName = Enc(fullName);
         username = Enc(username);
@@ -938,7 +938,7 @@ public class EmailService : IEmailService
                     <tr>
                         <td style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 32px 40px; text-align: left;'>
                             <div style='font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;'>
-                                PayClaim System
+                                Cakra System
                             </div>
                             <div style='font-size: 13px; color: #94a3b8; margin-top: 4px;'>
                                 HR &amp; Finance Management Portal
@@ -953,7 +953,7 @@ public class EmailService : IEmailService
                                 Halo, {fullName}
                             </h2>
                             <p style='margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: #475569;'>
-                                Kata sandi akun <strong>PayClaim</strong> Anda telah berhasil diatur ulang oleh Administrator. Berikut adalah kredensial baru Anda untuk masuk ke sistem:
+                                Kata sandi akun <strong>Cakra</strong> Anda telah berhasil diatur ulang oleh Administrator. Berikut adalah kredensial baru Anda untuk masuk ke sistem:
                             </p>
 
                             <!-- Credentials Box -->
@@ -983,7 +983,7 @@ public class EmailService : IEmailService
                             <!-- CTA Button -->
                             <div style='text-align: center; margin-bottom: 20px;'>
                                 <a href='{loginUrl}' target='_blank' style='display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);'>
-                                    Masuk ke Portal PayClaim &rarr;
+                                    Masuk ke Portal Cakra &rarr;
                                 </a>
                             </div>
 
@@ -997,7 +997,7 @@ public class EmailService : IEmailService
                     <tr>
                         <td style='background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 40px; text-align: center;'>
                             <p style='margin: 0; font-size: 12px; color: #94a3b8;'>
-                                &copy; 2026 PayClaim - HR &amp; Finance Management Portal. Seluruh hak cipta dilindungi undang-undang.
+                                &copy; 2026 Cakra - HR &amp; Finance Management Portal. Seluruh hak cipta dilindungi undang-undang.
                             </p>
                             <p style='margin: 4px 0 0 0; font-size: 11px; color: #cbd5e1;'>
                                 Email ini dikirim secara otomatis oleh sistem. Mohon tidak membalas email ini.

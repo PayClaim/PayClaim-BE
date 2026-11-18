@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PayClaim.DTOs.EmployeeBenefit;
 using PayClaim.DTOs.Master;
-using PayClaim.Features.EmployeeBenefits.Commands;
 using PayClaim.Features.EmployeeBenefits.Queries.GetMyBenefits;
 using PayClaim.Features.EmployeeBenefits.Query.GetEmployeeBenefits;
 
@@ -29,16 +28,5 @@ public class EmployeeBenefitsController(ISender sender) : ControllerBase
     {
         var result = await sender.Send(new GetMyBenefitsQuery(), ct);
         return Ok(result);
-    }
-
-    [Authorize(Roles = "Admin")]
-    [HttpPatch("{id:guid}")]
-    public async Task<IActionResult> Adjust(
-        Guid id,
-        [FromBody] AdjustEmployeeBenefitDto request,
-        CancellationToken ct)
-    {
-        await sender.Send(new AdjustEmployeeBenefitCommand(id, request), ct);
-        return Ok(new { message = "Employee benefit adjusted successfully." });
     }
 }

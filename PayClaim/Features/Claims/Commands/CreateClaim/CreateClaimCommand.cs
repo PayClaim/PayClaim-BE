@@ -88,17 +88,16 @@ public class CreateClaimHandler(
 
         string? benefitName = null;
 
-        // 2. Simpan file bukti pembayaran sebelum membuka transaksi DB agar lock tidak tertahan selama disk I/O
-        var filePath = string.Empty;
-
-        if (request.ReceiptFile != null &&
-            request.ReceiptFile.Length > 0)
+        // 2. Wajibkan bukti pembayaran dan simpan file sebelum membuka transaksi DB agar lock tidak tertahan selama disk I/O
+        if (request.ReceiptFile == null || request.ReceiptFile.Length == 0)
         {
-            filePath = await fileStorage.SaveFileAsync(
-                request.ReceiptFile,
-                "receipts",
-                ct);
+            throw new BusinessRuleException("Receipt file (proof of payment) is required.");
         }
+
+        var filePath = await fileStorage.SaveFileAsync(
+            request.ReceiptFile,
+            "receipts",
+            ct);
 
         Claim claim;
         try

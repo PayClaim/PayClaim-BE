@@ -30,7 +30,9 @@ public class GetMyBenefitsHandler(PayClaimDbContext db, ICurrentUser currentUser
                 .AsNoTracking()
                 .Include(bp => bp.Benefit)
                     .ThenInclude(b => b.Category)
-                .Where(bp => bp.DepartmentId == employee.DepartmentId && bp.PositionId == employee.PositionId)
+                .Where(bp => (bp.DepartmentId == employee.DepartmentId || bp.DepartmentId == "ALL") &&
+                             bp.PositionId == employee.PositionId)
+                .OrderBy(bp => bp.DepartmentId == "ALL" ? 1 : 0)
                 .ToListAsync(ct);
 
             var existingBenefits = await db.EmployeeBenefits
@@ -40,9 +42,15 @@ public class GetMyBenefitsHandler(PayClaimDbContext db, ICurrentUser currentUser
                 .ToListAsync(ct);
 
             bool hasChanges = false;
+            var processedBenefitIds = new HashSet<Guid>();
 
             foreach (var plan in plans)
             {
+                if (!processedBenefitIds.Add(plan.BenefitId))
+                {
+                    continue;
+                }
+
                 var existing = existingBenefits.FirstOrDefault(eb => eb.BenefitId == plan.BenefitId);
                 if (existing == null)
                 {
@@ -75,7 +83,21 @@ public class GetMyBenefitsHandler(PayClaimDbContext db, ICurrentUser currentUser
 
             if (hasChanges)
             {
-                await db.SaveChangesAsync(ct);
+                try
+                {
+                    await db.SaveChangesAsync(ct);
+                }
+                catch (DbUpdateException)
+                {
+                    // Request paralel baru saja menyisipkan (EmployeeId, BenefitId) yang sama
+                    db.ChangeTracker.Clear();
+                    existingBenefits = await db.EmployeeBenefits
+                        .AsNoTracking()
+                        .Include(eb => eb.Benefit)
+                            .ThenInclude(b => b.Category)
+                        .Where(eb => eb.EmployeeId == targetEmployeeId)
+                        .ToListAsync(ct);
+                }
             }
 
             return existingBenefits

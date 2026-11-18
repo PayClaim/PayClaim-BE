@@ -350,7 +350,8 @@ namespace PayClaim.Migrations
 
                     b.HasIndex("BenefitId");
 
-                    b.HasIndex("EmployeeId");
+                    b.HasIndex("EmployeeId", "BenefitId")
+                        .IsUnique();
 
                     b.ToTable("Employee_Benefit", (string)null);
                 });

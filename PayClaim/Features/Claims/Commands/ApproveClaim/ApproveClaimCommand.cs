@@ -160,7 +160,7 @@ public class ApproveClaimHandler(
 
         await using var tx = await context.Database.BeginTransactionAsync(ct);
 
-        // 6. Jika Finance menyetujui Benefit Claim, potong saldo Benefit
+        // 6. Jika Finance menyetujui Benefit Claim, potong saldo Benefit (hanya untuk klaim periode berjalan)
         if (currentLevel == 2 &&
             claim.ClaimType == ClaimType.Benefit)
         {
@@ -181,22 +181,26 @@ public class ApproveClaimHandler(
                     $"Employee benefit quota with ID '{claim.EmployeeBenefitId.Value}' was not found.");
             }
 
-            if (empBenefit.Balance < claim.Amount)
+            if (claim.TransactionDate >= empBenefit.StartDate &&
+                claim.TransactionDate <= empBenefit.EndDate)
             {
-                throw new BusinessRuleException(
-                    $"Cannot approve claim: Insufficient benefit quota balance. Available balance is Rp {empBenefit.Balance:N0}, but claim amount requested is Rp {claim.Amount:N0}.");
-            }
+                if (empBenefit.Balance < claim.Amount)
+                {
+                    throw new BusinessRuleException(
+                        $"Cannot approve claim: Insufficient benefit quota balance. Available balance is Rp {empBenefit.Balance:N0}, but claim amount requested is Rp {claim.Amount:N0}.");
+                }
 
-            var updatedRows = await context.EmployeeBenefits
-                .Where(eb => eb.Id == claim.EmployeeBenefitId.Value && eb.Balance >= claim.Amount)
-                .ExecuteUpdateAsync(
-                    s => s.SetProperty(eb => eb.Balance, eb => eb.Balance - claim.Amount),
-                    ct);
+                var updatedRows = await context.EmployeeBenefits
+                    .Where(eb => eb.Id == claim.EmployeeBenefitId.Value && eb.Balance >= claim.Amount)
+                    .ExecuteUpdateAsync(
+                        s => s.SetProperty(eb => eb.Balance, eb => eb.Balance - claim.Amount),
+                        ct);
 
-            if (updatedRows == 0)
-            {
-                throw new BusinessRuleException(
-                    $"Cannot approve claim: Insufficient benefit quota balance due to concurrent update.");
+                if (updatedRows == 0)
+                {
+                    throw new BusinessRuleException(
+                        $"Cannot approve claim: Insufficient benefit quota balance due to concurrent update.");
+                }
             }
         }
 

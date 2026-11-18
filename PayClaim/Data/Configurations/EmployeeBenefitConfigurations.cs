@@ -25,6 +25,9 @@ public class EmployeeBenefitConfigurations
             .HasColumnType("date")
             .IsRequired();
 
+        builder.HasIndex(eb => new { eb.EmployeeId, eb.BenefitId })
+            .IsUnique();
+
         builder.HasOne(eb => eb.Employee)
             .WithMany()
             .HasForeignKey(eb => eb.EmployeeId)

@@ -42,7 +42,8 @@ public class GetClaimByIdHandler(PayClaimDbContext context, ICurrentUser current
         var isFinance = roles.Contains("Finance", StringComparer.OrdinalIgnoreCase) ||
             roles.Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
 
-        var isManager = roles.Contains("Manager", StringComparer.OrdinalIgnoreCase);
+        var isManager = roles.Contains("Manager", StringComparer.OrdinalIgnoreCase) ||
+            roles.Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
 
         var isOwner = employeeId.HasValue &&
             claimAccess.EmployeeId == employeeId.Value;

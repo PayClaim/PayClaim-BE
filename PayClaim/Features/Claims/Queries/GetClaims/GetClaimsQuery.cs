@@ -32,11 +32,13 @@ public class GetClaimsHandler(PayClaimDbContext context, ICurrentUser currentUse
 
         bool isAdmin = roles.Contains("Admin", StringComparer.OrdinalIgnoreCase);
 
-        bool isManager = roles.Contains("Manager", StringComparer.OrdinalIgnoreCase);
+        bool isFinanceManager = roles.Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
+
+        bool isManager = roles.Contains("Manager", StringComparer.OrdinalIgnoreCase) || isFinanceManager;
 
         bool isFinance =
             roles.Contains("Finance", StringComparer.OrdinalIgnoreCase) ||
-            roles.Contains("Finance Manager", StringComparer.OrdinalIgnoreCase);
+            isFinanceManager;
 
         if (query.IsMyClaims)
         {

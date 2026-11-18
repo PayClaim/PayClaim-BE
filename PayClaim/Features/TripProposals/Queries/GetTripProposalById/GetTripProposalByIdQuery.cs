@@ -78,7 +78,7 @@ public class GetTripProposalByIdHandler(
         }
 
         bool isDirectManager =
-            isManager &&
+            (isManager || isFinanceManager) &&
             accessInfo.PicManagerId == currentEmpId;
 
         bool hasAccess =

@@ -116,10 +116,10 @@ public class ApproveTripProposalHandler(
         // LEVEL 1: MANAGER
         if (proposal.Status == TripProposalStatus.Submitted)
         {
-            if (!hasManagerRole && !hasAdminRole)
+            if (!hasManagerRole && !hasFinanceManagerRole && !hasAdminRole)
             {
                 throw new ForbiddenException(
-                    "Only Manager or Admin can approve this trip proposal.");
+                    "Only Manager, Finance Manager, or Admin can approve this trip proposal.");
             }
 
             if (!hasAdminRole)
@@ -175,74 +175,11 @@ public class ApproveTripProposalHandler(
 
             if (command.Request.Decision == TripApprovalDecision.Approved)
             {
-                // Finance must provide the Accommodation Budget.
-                if (!command.Request.TotalAmount.HasValue)
-                {
-                    throw new BusinessRuleException(
-                        "Finance must provide the accommodation budget.");
-                }
-
-                decimal approvedAccommodationBudget =
-                    command.Request.TotalAmount.Value;
-
-                if (approvedAccommodationBudget <= 0)
-                {
-                    throw new BusinessRuleException(
-                        "Accommodation budget must be greater than zero.");
-                }
-
-                // Keep the previous and updated budget for approval history.
-                previousAccommodationBudget = proposal.TotalAmount;
-                updatedAccommodationBudget = approvedAccommodationBudget;
-
-                // Update Accommodation Budget.
-                proposal.TotalAmount = approvedAccommodationBudget;
-
-                var requestedParticipants = command.Request.Participants;
-
-                // Finance must provide limits for all participants.
-                if (requestedParticipants == null ||
-                    requestedParticipants.Count != proposal.Participants.Count)
-                {
-                    throw new BusinessRuleException(
-                        "Finance must provide reimbursement limits for all participants.");
-                }
-
-                // Prevent duplicate Employee IDs.
-                var duplicateEmployees = requestedParticipants
-                    .GroupBy(p => p.EmployeeId)
-                    .Where(g => g.Count() > 1)
-                    .Select(g => g.Key)
-                    .ToList();
-
-                if (duplicateEmployees.Count > 0)
-                {
-                    throw new BusinessRuleException(
-                        "Duplicate participant detected in approval request.");
-                }
-
-                // Save the reimbursement limit for each participant.
-                foreach (var participantDto in requestedParticipants)
-                {
-                    if (participantDto.Amount <= 0)
-                    {
-                        throw new BusinessRuleException(
-                            "Participant reimbursement limit must be greater than zero.");
-                    }
-
-                    var participant = proposal.Participants
-                        .FirstOrDefault(
-                            p => p.EmployeeId == participantDto.EmployeeId);
-
-                    if (participant == null)
-                    {
-                        throw new BusinessRuleException(
-                            $"Employee '{participantDto.EmployeeId}' is not a participant of this proposal.");
-                    }
-
-                    // This limit applies to the entire trip, not per day.
-                    participant.Amount = participantDto.Amount;
-                }
+                ApplyBudgetAndParticipantLimits(
+                    proposal,
+                    command.Request,
+                    out previousAccommodationBudget,
+                    out updatedAccommodationBudget);
 
                 // Total reimbursement limits for all participants.
                 decimal participantTotal = proposal.Participants
@@ -256,7 +193,7 @@ public class ApproveTripProposalHandler(
                 bool exceedsFinanceLimit =
                     proposedTotalAmount > TripProposalApprovalLimit.FinanceLimit;
 
-                if (exceedsFinanceLimit && !hasFinanceManagerRole)
+                if (exceedsFinanceLimit && !hasFinanceManagerRole && !hasAdminRole)
                 {
                     nextStatus =
                         TripProposalStatus.FinanceManagerReview;
@@ -302,6 +239,17 @@ public class ApproveTripProposalHandler(
 
             currentLevel = 3;
 
+            if (command.Request.Decision == TripApprovalDecision.Approved &&
+                (proposal.Participants.Any(p => p.Amount <= 0) ||
+                 command.Request.Participants != null))
+            {
+                ApplyBudgetAndParticipantLimits(
+                    proposal,
+                    command.Request,
+                    out previousAccommodationBudget,
+                    out updatedAccommodationBudget);
+            }
+
             nextStatus = command.Request.Decision switch
             {
                 TripApprovalDecision.Approved =>
@@ -329,8 +277,8 @@ public class ApproveTripProposalHandler(
         string? approvalNotes = command.Request.Notes;
 
         // Add budget adjustment information to Notes only when
-        // Finance approves and actually changes the Accommodation Budget.
-        if (currentLevel == 2 &&
+        // Finance / Finance Manager approves and actually changes the Accommodation Budget.
+        if ((currentLevel == 2 || currentLevel == 3) &&
             command.Request.Decision == TripApprovalDecision.Approved &&
             previousAccommodationBudget.HasValue &&
             updatedAccommodationBudget.HasValue &&
@@ -474,5 +422,68 @@ public class ApproveTripProposalHandler(
             ApprovalLevel = approvalRecord.ApprovalLevel,
             DecidedAt = approvalRecord.DecidedAt
         };
+    }
+
+    private static void ApplyBudgetAndParticipantLimits(
+        TripProposal proposal,
+        TripApprovalActionDto request,
+        out decimal? previousAccommodationBudget,
+        out decimal? updatedAccommodationBudget)
+    {
+        if (!request.TotalAmount.HasValue)
+        {
+            throw new BusinessRuleException(
+                "Finance must provide the accommodation budget.");
+        }
+
+        decimal approvedAccommodationBudget = request.TotalAmount.Value;
+        if (approvedAccommodationBudget <= 0)
+        {
+            throw new BusinessRuleException(
+                "Accommodation budget must be greater than zero.");
+        }
+
+        previousAccommodationBudget = proposal.TotalAmount;
+        updatedAccommodationBudget = approvedAccommodationBudget;
+        proposal.TotalAmount = approvedAccommodationBudget;
+
+        var requestedParticipants = request.Participants;
+        if (requestedParticipants == null ||
+            requestedParticipants.Count != proposal.Participants.Count)
+        {
+            throw new BusinessRuleException(
+                "Finance must provide reimbursement limits for all participants.");
+        }
+
+        var hasDuplicate = requestedParticipants
+            .GroupBy(p => p.EmployeeId)
+            .Any(g => g.Count() > 1);
+
+        if (hasDuplicate)
+        {
+            throw new BusinessRuleException(
+                "Duplicate participant detected in approval request.");
+        }
+
+        foreach (var participantDto in requestedParticipants)
+        {
+            if (participantDto.Amount <= 0)
+            {
+                throw new BusinessRuleException(
+                    "Participant reimbursement limit must be greater than zero.");
+            }
+
+            var participant = proposal.Participants
+                .FirstOrDefault(p => p.EmployeeId == participantDto.EmployeeId);
+
+            if (participant == null)
+            {
+                throw new BusinessRuleException(
+                    $"Employee '{participantDto.EmployeeId}' is not a participant of this proposal.");
+            }
+
+            // Limit berlaku untuk total perjalanan, bukan per hari.
+            participant.Amount = participantDto.Amount;
+        }
     }
 }

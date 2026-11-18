@@ -52,7 +52,7 @@ public class GetDashboardSummaryHandler(
             : context.Claims.AsNoTracking().Where(_ => false);
 
         IQueryable<Claim> visibleClaimsQuery = isApprover
-            ? BuildVisibleClaimsQuery(isAdmin, isManager, isFinance || isFinanceManager, currentEmpId)
+            ? BuildVisibleClaimsQuery(isAdmin, isManager || isFinanceManager, isFinance || isFinanceManager, currentEmpId)
             : myClaimsQuery;
 
         var myProposalsQuery = currentEmpId != Guid.Empty
@@ -61,7 +61,7 @@ public class GetDashboardSummaryHandler(
             : context.TripProposals.AsNoTracking().Where(_ => false);
 
         var visibleProposalsQuery = BuildVisibleProposalsQuery(
-            isAdmin, isManager, isFinance, isFinanceManager, currentEmpId);
+            isAdmin, isManager || isFinanceManager, isFinance, isFinanceManager, currentEmpId);
 
         // 2. Today Summary Counts (SQL COUNT)
         if (!isAdmin)
@@ -90,11 +90,10 @@ public class GetDashboardSummaryHandler(
             var approvableClaimsQuery = visibleClaimsQuery.Where(c => c.EmployeeId != currentEmpId);
             result.TodaySummary.PendingClaimApprovalsCount = isAdmin
                 ? await approvableClaimsQuery.CountAsync(c => c.Status == ClaimStatus.Submitted || c.Status == ClaimStatus.UnderReview, ct)
-                : isManager
-                    ? await approvableClaimsQuery.CountAsync(c => c.Status == ClaimStatus.Submitted, ct)
-                    : isFinance
-                        ? await approvableClaimsQuery.CountAsync(c => c.Status == ClaimStatus.UnderReview, ct)
-                        : 0;
+                : await approvableClaimsQuery.CountAsync(c =>
+                    (isManager && c.Status == ClaimStatus.Submitted) ||
+                    ((isFinance || isFinanceManager) && c.Status == ClaimStatus.UnderReview) ||
+                    (isFinanceManager && c.Status == ClaimStatus.Submitted && c.Employee.ManagerId == currentEmpId), ct);
 
             var approvableProposalsQuery = visibleProposalsQuery
                 .Where(tp => !tp.Participants.Any(p => p.IsPic && p.EmployeeId == currentEmpId));
@@ -103,13 +102,13 @@ public class GetDashboardSummaryHandler(
                     tp.Status == TripProposalStatus.Submitted ||
                     tp.Status == TripProposalStatus.UnderReview ||
                     tp.Status == TripProposalStatus.FinanceManagerReview, ct)
-                : isManager
-                    ? await approvableProposalsQuery.CountAsync(tp => tp.Status == TripProposalStatus.Submitted, ct)
-                    : isFinance
-                        ? await approvableProposalsQuery.CountAsync(tp => tp.Status == TripProposalStatus.UnderReview, ct)
-                        : isFinanceManager
-                            ? await approvableProposalsQuery.CountAsync(tp => tp.Status == TripProposalStatus.FinanceManagerReview, ct)
-                            : 0;
+                : await approvableProposalsQuery.CountAsync(tp =>
+                    (isManager && tp.Status == TripProposalStatus.Submitted) ||
+                    ((isFinance || isFinanceManager) && tp.Status == TripProposalStatus.UnderReview) ||
+                    (isFinanceManager &&
+                     (tp.Status == TripProposalStatus.FinanceManagerReview ||
+                      (tp.Status == TripProposalStatus.Submitted &&
+                       tp.Participants.Any(p => p.IsPic && p.Employee.ManagerId == currentEmpId)))), ct);
         }
 
         // 3. Benefits (for non-Admin)

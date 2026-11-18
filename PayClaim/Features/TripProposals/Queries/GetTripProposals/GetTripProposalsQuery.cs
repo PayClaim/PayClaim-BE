@@ -40,6 +40,8 @@ public class GetTripProposalsHandler(PayClaimDbContext context, ICurrentUser cur
             .AsNoTracking()
             .AsQueryable();
 
+        bool canActAsDirectManager = isManager || isFinanceManager;
+
         // 1. Filter berdasarkan hak akses user
         if (!isAdmin)
         {
@@ -60,10 +62,10 @@ public class GetTripProposalsHandler(PayClaimDbContext context, ICurrentUser cur
 
                 ||
 
-                // Manager melihat proposal dari direct report (PIC)
-                // atau yang pernah diapprove oleh Manager ini
+                // Manager / Finance Manager melihat proposal dari direct report (PIC)
+                // atau yang pernah diapprove olehnya
                 (
-                    isManager &&
+                    canActAsDirectManager &&
                     (
                         tp.Participants.Any(p =>
                             p.IsPic &&
@@ -166,7 +168,7 @@ public class GetTripProposalsHandler(PayClaimDbContext context, ICurrentUser cur
                         r.Status == TripProposalStatus.Submitted ||
                         r.Status == TripProposalStatus.UnderReview ||
                         r.Status == TripProposalStatus.FinanceManagerReview)) ||
-                    (isManager && r.Status == TripProposalStatus.Submitted) ||
+                    (canActAsDirectManager && r.Status == TripProposalStatus.Submitted) ||
                     ((isFinance || isFinanceManager) && r.Status == TripProposalStatus.UnderReview) ||
                     (isFinanceManager && r.Status == TripProposalStatus.FinanceManagerReview))),
             WaitingAmount = summaryRows
@@ -179,7 +181,7 @@ public class GetTripProposalsHandler(PayClaimDbContext context, ICurrentUser cur
                             r.Status == TripProposalStatus.Submitted ||
                             r.Status == TripProposalStatus.UnderReview ||
                             r.Status == TripProposalStatus.FinanceManagerReview)) ||
-                        (isManager && r.Status == TripProposalStatus.Submitted) ||
+                        (canActAsDirectManager && r.Status == TripProposalStatus.Submitted) ||
                         ((isFinance || isFinanceManager) && r.Status == TripProposalStatus.UnderReview) ||
                         (isFinanceManager && r.Status == TripProposalStatus.FinanceManagerReview)))
                 .Sum(r => r.TotalAmount),

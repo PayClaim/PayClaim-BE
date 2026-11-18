@@ -42,12 +42,17 @@ public class PayClaimHandler(
 
         disburser ??= await context.Employees
             .Include(e => e.Position)
-            .FirstOrDefaultAsync(e => e.Position.Title.Contains("Finance"), ct)
-            ?? await context.Employees.FirstOrDefaultAsync(ct);
+            .FirstOrDefaultAsync(e => e.Id != claim.EmployeeId && e.Position.Title.Contains("Finance"), ct)
+            ?? await context.Employees.FirstOrDefaultAsync(e => e.Id != claim.EmployeeId, ct);
 
         if (disburser == null)
         {
             throw new NotFoundException("No eligible finance employee found to record disbursement.");
+        }
+
+        if (claim.EmployeeId == disburser.Id)
+        {
+            throw new ForbiddenException("You cannot disburse your own claim.");
         }
 
         var approvalRecord = new ClaimApproval
